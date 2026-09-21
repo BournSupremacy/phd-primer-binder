@@ -1,0 +1,22 @@
+# Conda environment for the demux/QC/alignment part of the pipeline.
+#   conda env create -f environment.yml
+#   conda activate rcaT-binder-screen
+#
+# bcl-convert is NOT distributed on conda - install it separately from
+# Illumina (https://support.illumina.com/sequencing/sequencing_software/bcl-convert.html).
+# It runs fine alongside this env; it doesn't need to be inside it.
+#
+# R and its packages (used by analysis/DMS_analysis.Rmd) are listed separately
+# in README.md rather than here, since most students will use their existing
+# RStudio / R installation rather than a conda R.
+name: rcaT-binder-screen
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pysam
+  - bwa
+  - samtools
+  - fastp

@@ -1,0 +1,316 @@
+---
+title: "RcaT binder pooled screen: DMS-style analysis"
+author: "PhD Primer - Dorrity/Mahamid/Eustermann groups"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.width = 7, fig.height = 4.5)
+```
+
+## 0. What this notebook does
+
+We designed ~96 candidate binders against the RcaT toxin. Cells carrying the
+pooled binder library were grown under 6 conditions (no inducer, toxin-only,
+library-only at two IPTG levels, and toxin+library at two IPTG levels), each
+in duplicate (A/B). RcaT kills the cell unless it's bound/inhibited, so **a
+binder's relative read count after selection is a proxy for how well it
+protects the cell** - good binders get relatively enriched when both the
+toxin and the binder are induced together.
+
+Steps below:
+
+1. Load the counts table produced by `scripts/count_reads_per_binder.py`
+   (`results/binder_counts.tsv`) and the sample metadata (`config/samples.tsv`).
+2. QC: read depth per sample, how many binders are actually detected.
+3. Normalise within each sample (sequencing depth differs sample to sample).
+4. log2 fold-changes: first each induced condition vs. no-inducer baseline
+   (sanity checks), then the condition that actually answers the biological
+   question - toxin+library vs. toxin-only, i.e. does inducing the binder
+   rescue growth under toxin challenge relative to toxin alone?
+5. Check that replicates A and B agree.
+6. Final ranked hit table.
+
+```{r libraries}
+library(tidyverse)   # readr, dplyr, tidyr, ggplot2, purrr
+library(scales)      # nice axis labels
+```
+
+## 1. Load data
+
+```{r load-data}
+counts_long <- read_tsv("../results/binder_counts.tsv", show_col_types = FALSE)
+samples     <- read_tsv("../config/samples.tsv", show_col_types = FALSE)
+
+# scripts/count_reads_per_binder.py only writes a row when a binder has at
+# least one read in a sample, so binder x sample combinations with zero
+# reads are simply absent here. Fill those in explicitly as count = 0 -
+# a binder legitimately dropping to zero in a condition (e.g. a non-binder
+# under toxin+library selection) is exactly the kind of result we want to
+# see below, not a row that silently disappears from the analysis.
+counts_long <- counts_long %>%
+  complete(binder_id, sample_id = samples$sample_id, fill = list(count = 0)) %>%
+  left_join(samples %>% select(sample_id, condition, replicate, ara_pct, iptg_mM),
+            by = "sample_id")
+
+head(counts_long)
+```
+
+Reshape to a wide binder x sample matrix - this is the table students should
+picture as "the" dataset from here on (rows = binders, columns = samples).
+
+```{r wide-matrix}
+counts_wide <- counts_long %>%
+  select(binder_id, sample_id, count) %>%
+  pivot_wider(names_from = sample_id, values_from = count, values_fill = 0)
+
+counts_wide
+```
+
+## 2. QC: sequencing depth and binder detection
+
+```{r qc-depth}
+depth <- counts_long %>%
+  group_by(sample_id, condition, replicate) %>%
+  summarise(total_reads = sum(count), n_binders_detected = sum(count > 0), .groups = "drop")
+
+depth %>%
+  ggplot(aes(x = reorder(sample_id, total_reads), y = total_reads, fill = condition)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = NULL, y = "Total usable read pairs", title = "Sequencing depth per sample") +
+  theme_minimal()
+```
+
+```{r qc-table}
+depth
+```
+
+If a sample has much lower depth than the others, everything downstream
+(especially rare/low-abundance binders) will be noisier for that sample -
+keep this table in mind when interpreting later plots. If you ran
+`scripts/count_reads_per_binder.py`, also check the companion
+`results/binder_counts_qc.tsv` for how many read pairs were dropped as
+unmapped / low-MAPQ / mate-mismatch per sample - a sample with a lot of
+`mate_reference_mismatch` hits suggests some binders may share long
+identical stretches of sequence and can't always be told apart from a single
+read pair.
+
+## 3. Normalisation
+
+Sequencing depth differs between samples, so raw counts aren't directly
+comparable. We convert each binder's count to its **relative frequency
+within the sample** (equivalent to counts-per-million, just expressed as a
+fraction) - this is the natural normalisation for a competitive pooled assay,
+since what we actually care about is what fraction of the surviving
+population each binder makes up, not its absolute read count.
+
+A small pseudocount is added before taking logs so that binders with zero
+reads in a given sample don't produce `-Inf`.
+
+```{r normalise}
+pseudocount <- 1
+
+counts_norm <- counts_long %>%
+  group_by(sample_id) %>%
+  mutate(
+    total_reads = sum(count),
+    freq        = (count + pseudocount) / (total_reads + pseudocount * n_distinct(counts_long$binder_id))
+  ) %>%
+  ungroup()
+
+counts_norm %>% select(sample_id, binder_id, count, total_reads, freq) %>% head()
+```
+
+## 4. log2 fold-changes
+
+We average the two replicates' normalised frequency for each condition
+first, then take log2 ratios between conditions. (Section 5 checks the
+replicates actually agree with each other before we lean on this average.)
+
+```{r condition-means}
+condition_means <- counts_norm %>%
+  group_by(condition, binder_id) %>%
+  summarise(mean_freq = mean(freq), .groups = "drop")
+
+condition_means %>% head()
+```
+
+### 4a. Sanity-check comparisons: each induced condition vs. no-inducer
+
+These aren't the final answer, but they're a useful check that induction is
+doing *something* (e.g. toxin-only should broadly suppress growth relative
+to no-inducer, roughly uniformly across binders since none are expressed yet
+- IPTG is 0 in that condition).
+
+```{r lfc-vs-baseline}
+baseline <- condition_means %>%
+  filter(condition == "no_inducer") %>%
+  select(binder_id, baseline_freq = mean_freq)
+
+lfc_vs_baseline <- condition_means %>%
+  filter(condition != "no_inducer") %>%
+  left_join(baseline, by = "binder_id") %>%
+  mutate(log2FC = log2(mean_freq / baseline_freq))
+
+lfc_vs_baseline %>%
+  ggplot(aes(x = binder_id, y = log2FC)) +
+  geom_col() +
+  facet_wrap(~condition, ncol = 1) +
+  labs(x = "Binder", y = "log2FC vs. no_inducer", title = "Each condition vs. no-inducer baseline") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank())
+```
+
+### 4b. The actual question: toxin+library vs. toxin-only
+
+This isolates the effect of *inducing the binder* while the toxin is
+present, which is what should separate good binders (protective, so
+enriched) from the rest. We do this at both IPTG concentrations.
+
+```{r lfc-key-comparison}
+toxin_only_mean <- condition_means %>%
+  filter(condition == "toxin_only") %>%
+  select(binder_id, toxin_only_freq = mean_freq)
+
+key_comparison <- condition_means %>%
+  filter(condition %in% c("toxin_plus_library_0.1mM", "toxin_plus_library_1mM")) %>%
+  left_join(toxin_only_mean, by = "binder_id") %>%
+  mutate(log2FC_vs_toxinOnly = log2(mean_freq / toxin_only_freq))
+
+key_comparison %>%
+  ggplot(aes(x = reorder(binder_id, log2FC_vs_toxinOnly), y = log2FC_vs_toxinOnly, fill = condition)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  labs(x = "Binder", y = "log2FC vs. toxin-only",
+       title = "Enrichment of each binder when co-induced with toxin",
+       subtitle = "Positive = binder rescues growth (protective) relative to toxin alone") +
+  theme_minimal()
+```
+
+## 5. Replicate consistency
+
+Before trusting the log2FC table above, check that replicate A and
+replicate B agree - both on raw-ish normalised frequency (library
+complexity/correlation) and on the derived log2FC (biological
+reproducibility of the actual result we care about).
+
+```{r replicate-freq-correlation}
+rep_wide <- counts_norm %>%
+  select(sample_id, binder_id, freq, condition, replicate) %>%
+  pivot_wider(id_cols = c(binder_id, condition), names_from = replicate, values_from = freq)
+
+rep_wide %>%
+  ggplot(aes(x = A, y = B)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey40") +
+  scale_x_log10(labels = label_number()) +
+  scale_y_log10(labels = label_number()) +
+  facet_wrap(~condition) +
+  labs(title = "Replicate A vs B: normalised binder frequency", x = "Rep A freq", y = "Rep B freq") +
+  theme_minimal()
+
+rep_wide %>%
+  group_by(condition) %>%
+  summarise(pearson_r = cor(log10(A), log10(B), use = "complete.obs"), .groups = "drop")
+```
+
+Now the same check on the log2FC that actually feeds the hit-calling below -
+compute log2FC(toxin+library vs toxin-only) **per replicate** (not averaged)
+and compare A vs B directly.
+
+```{r replicate-lfc-consistency}
+per_rep_freq <- counts_norm %>%
+  select(sample_id, binder_id, condition, replicate, freq)
+
+toxin_only_per_rep <- per_rep_freq %>%
+  filter(condition == "toxin_only") %>%
+  select(binder_id, replicate, toxin_only_freq = freq)
+
+lfc_per_rep <- per_rep_freq %>%
+  filter(condition %in% c("toxin_plus_library_0.1mM", "toxin_plus_library_1mM")) %>%
+  left_join(toxin_only_per_rep, by = c("binder_id", "replicate")) %>%
+  mutate(log2FC = log2(freq / toxin_only_freq))
+
+lfc_per_rep_wide <- lfc_per_rep %>%
+  pivot_wider(id_cols = c(binder_id, condition), names_from = replicate, values_from = log2FC)
+
+lfc_per_rep_wide %>%
+  ggplot(aes(x = A, y = B)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey40") +
+  facet_wrap(~condition) +
+  labs(title = "Replicate A vs B: log2FC (toxin+library vs toxin-only)",
+       x = "Rep A log2FC", y = "Rep B log2FC") +
+  theme_minimal()
+
+lfc_per_rep_wide %>%
+  group_by(condition) %>%
+  summarise(pearson_r = cor(A, B, use = "complete.obs"), .groups = "drop")
+```
+
+**A binder is only worth trusting as a hit if its two replicates agree** -
+flag anything where A and B disagree in sign or differ by a lot, and treat
+those as inconclusive rather than as hits or non-hits.
+
+```{r flag-inconsistent}
+consistency_threshold <- 1  # max allowed |A - B| in log2FC units; tune by eye from the plot above
+
+lfc_flagged <- lfc_per_rep_wide %>%
+  mutate(
+    same_direction = sign(A) == sign(B),
+    abs_diff       = abs(A - B),
+    consistent     = same_direction & abs_diff <= consistency_threshold
+  )
+
+lfc_flagged %>% count(condition, consistent)
+```
+
+## 6. Final ranked hit table
+
+Average the two replicates' log2FC (toxin+library vs toxin-only) for
+consistent binders only, and rank.
+
+```{r final-hits}
+final_hits <- lfc_flagged %>%
+  filter(consistent) %>%
+  mutate(mean_log2FC = (A + B) / 2) %>%
+  select(binder_id, condition, mean_log2FC, A, B) %>%
+  arrange(condition, desc(mean_log2FC))
+
+final_hits
+```
+
+```{r final-plot}
+final_hits %>%
+  filter(condition == "toxin_plus_library_1mM") %>%
+  slice_max(mean_log2FC, n = 20) %>%
+  ggplot(aes(x = reorder(binder_id, mean_log2FC), y = mean_log2FC)) +
+  geom_col(fill = "steelblue") +
+  geom_errorbar(aes(ymin = pmin(A, B), ymax = pmax(A, B)), width = 0.2) +
+  coord_flip() +
+  labs(x = "Binder", y = "log2FC vs toxin-only (1 mM IPTG)",
+       title = "Top 20 RcaT binders by replicate-consistent enrichment") +
+  theme_minimal()
+```
+
+```{r save-final-table}
+write_csv(final_hits, "../results/final_binder_ranking.csv")
+```
+
+## Where to go from here
+
+* This uses a simple frequency-ratio log2FC, which is easy to reason about
+  but doesn't model count-based variance the way tools like DESeq2/edgeR do
+  (which down-weight noisy, low-count binders and give you a p-value per
+  binder). If you want to go further, feeding `counts_wide` into DESeq2 with
+  a design of `~ condition` and pulling the `toxin_plus_library_*` vs.
+  `toxin_only` contrast is a natural next step.
+* Consider also looking at the 0.1 mM vs 1 mM IPTG comparison directly - a
+  true binder should show a dose response (more enrichment at higher
+  induction), which is another consistency check independent of replicates.

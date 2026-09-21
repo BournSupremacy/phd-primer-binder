@@ -1,0 +1,27 @@
+# Raw and intermediate sequencing data (large, not for git)
+data/raw_bcl/
+data/demux/*/*.fastq.gz
+data/qc_trimmed/
+results/bam/
+results/*.bam
+results/*.bam.bai
+*.fastq.gz
+*.fq.gz
+
+# keep placeholders
+!data/demux/.gitkeep
+!results/.gitkeep
+
+# R
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+analysis/*_cache/
+analysis/*_files/
+
+# misc
+.DS_Store
+*.log
+__pycache__/
+*.pyc

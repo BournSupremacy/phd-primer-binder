@@ -1,0 +1,41 @@
+# Template BCL Convert (v2) sample sheet for demultiplexing the dual-PCR-barcoded
+# pooled binder library on the MiSeq i100.
+#
+# Fill in the real index sequences used for each PCR barcoding primer pair and
+# save as config/IlluminaSampleSheet.csv (that filename is what scripts/00_bcl_to_fastq.sh
+# expects by default; override with --sample-sheet if you name it differently).
+#
+# Sample_ID values below match sample_id in config/samples.tsv - keep them identical
+# so downstream steps can find the right fastq files automatically.
+#
+# NOTE for legacy bcl2fastq users: bcl2fastq expects a [Data] section (not
+# [BCLConvert_Data]) with columns Sample_ID,Sample_Name,index,index2,Sample_Project
+# and no [BCLConvert_Settings] section. See README.md for why we recommend
+# BCL Convert instead for MiSeq i100 output.
+[Header]
+FileFormatVersion,2
+RunName,phd_primer_RcaT_binder_screen
+InstrumentPlatform,MiSeq
+
+[Reads]
+Read1Cycles,150
+Read2Cycles,150
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+AdapterRead2,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Sample_ID,index,index2
+noInducer_A,NNNNNNNN,NNNNNNNN
+noInducer_B,NNNNNNNN,NNNNNNNN
+toxinOnly_A,NNNNNNNN,NNNNNNNN
+toxinOnly_B,NNNNNNNN,NNNNNNNN
+libOnly_0.1mM_A,NNNNNNNN,NNNNNNNN
+libOnly_0.1mM_B,NNNNNNNN,NNNNNNNN
+libOnly_1mM_A,NNNNNNNN,NNNNNNNN
+libOnly_1mM_B,NNNNNNNN,NNNNNNNN
+toxLib_0.1mM_A,NNNNNNNN,NNNNNNNN
+toxLib_0.1mM_B,NNNNNNNN,NNNNNNNN
+toxLib_1mM_A,NNNNNNNN,NNNNNNNN
+toxLib_1mM_B,NNNNNNNN,NNNNNNNN

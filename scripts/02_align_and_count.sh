@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ ! -f "$REF" ]]; then
-  echo "Error: reference fasta not found at $REF (see data/binders.example.fasta for the expected format; replace with your real 96 binder sequences)" >&2
+  echo "Error: reference fasta not found at $REF" >&2
   exit 1
 fi
 

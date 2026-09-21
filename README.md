@@ -6,7 +6,7 @@ high-throughput biochemistry"* (Dorrity/Mahamid/Eustermann groups, MSB Unit).
 
 ## The experiment
 
-~96 computationally-designed binders against the RcaT toxin are pooled and
+88 computationally-designed binders against the RcaT toxin are pooled and
 expressed in *E. coli* carrying the RcaT toxin-antitoxin system. RcaT kills
 the cell unless something inhibits it, so **a binder's relative abundance
 after selection is a readout of how well it protects the cell**: the better
@@ -31,9 +31,9 @@ This is deliberately much simpler than
 [DiMSum](https://github.com/lehner-lab/DiMSum): DiMSum is built to reconstruct
 and call mutations across a whole deep-mutational-scanning library from
 overlapping paired-end reads. Here the reference panel is a small set of
-**96 known, fixed sequences** - we just need to count which one each read
-pair came from, so the pipeline is: demux -> trim -> align to the 96
-binders -> count -> a plain R Markdown DMS-style comparison. No merging,
+**known, fixed sequences** (88 of them) - we just need to count which one
+each read pair came from, so the pipeline is: demux -> trim -> align to the
+88 binders -> count -> a plain R Markdown DMS-style comparison. No merging,
 no variant calling.
 
 ## Your two questions, answered
@@ -51,7 +51,7 @@ that's the whole point of "paired-end" alignment (it's exactly how routine
 WGS/RNA-seq libraries with fragments much longer than 2x read length are
 handled). So for binders longer than 300bp, R1 anchors the 5' end and R2
 (reverse-complemented) anchors the 3' end, with an unsequenced gap in the
-middle - `bwa mem` still correctly identifies which of the 96 references
+middle - `bwa mem` still correctly identifies which of the 88 references
 the pair came from, and `scripts/count_reads_per_binder.py` requires both
 mates to agree on the same reference before counting a pair (see
 `results/binder_counts_qc.tsv` for how often they don't).
@@ -80,7 +80,7 @@ config/
   samples.tsv                     sample sheet used by every downstream step
   IlluminaSampleSheet_template.csv template BCL Convert sample sheet for demux (fill in real indices)
 data/
-  binders.example.fasta           tiny illustrative example - replace with your real 96 binders as data/binders.fasta
+  binders.fasta                   the 88 designed RcaT binder sequences - the alignment reference used throughout
   demux/                          per-sample demultiplexed fastq.gz land here
 scripts/
   00_bcl_to_fastq.sh               demultiplex raw sequencer output -> data/demux/<sample_id>/
@@ -100,7 +100,7 @@ results/                           binder_counts.tsv and everything the R notebo
 ### 0. Try it now with simulated data (no wet-lab data needed yet)
 
 ```bash
-python3 scripts/simulate_test_data.py     # writes data/binders.fasta + data/demux/*/*.fastq.gz
+python3 scripts/simulate_test_data.py     # writes synthetic reads for the real binders to data/demux/*/*.fastq.gz
 scripts/01_qc_trim.sh
 scripts/02_align_and_count.sh
 ```
@@ -111,24 +111,25 @@ working end-to-end example with a handful of "true" binders simulated to be
 enriched, useful for the students to see what a real hit should look like
 before real sequencing data comes back.
 
-### 1. With real data
+### 1. With real sequencing data
 
-1. Put your 96 real binder sequences in `data/binders.fasta` (FASTA, one
-   header per binder, headers become the IDs used everywhere downstream -
-   see `data/binders.example.fasta` for the expected format).
-2. Copy `config/IlluminaSampleSheet_template.csv` to
+`data/binders.fasta` already contains the 88 designed binder sequences
+(headers = their design names) and is used as the alignment reference
+throughout - nothing to do there.
+
+1. Copy `config/IlluminaSampleSheet_template.csv` to
    `config/IlluminaSampleSheet.csv` and fill in the real i7/i5 index
    sequences for each of the 12 PCR-barcoded samples.
-3. Check `config/samples.tsv` - the `sample_id` column must match the
+2. Check `config/samples.tsv` - the `sample_id` column must match the
    `Sample_ID`s in your Illumina sample sheet.
-4. Run:
+3. Run:
    ```bash
    ./run_pipeline.sh --run-dir /path/to/raw/MiSeqRun --ref data/binders.fasta
    ```
    or the individual `scripts/00_*`, `01_*`, `02_*` steps one at a time -
    each is a standalone script with `--help`-able arguments, useful for
    understanding/debugging one step at a time.
-5. Open `analysis/DMS_analysis.Rmd` and knit it.
+4. Open `analysis/DMS_analysis.Rmd` and knit it.
 
 ## Tool requirements
 

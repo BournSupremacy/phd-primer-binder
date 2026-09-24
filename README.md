@@ -100,31 +100,31 @@ run the real pipeline steps themselves.
 ## Environment setup
 
 Each script loads what it needs via cluster environment modules, right
-after `set -euo pipefail`:
+after `set -euo pipefail` - no conda required on a cluster that provides
+these:
 
 - `scripts/00_bcl_to_fastq.sh`: `module load bcl-convert`
 - `scripts/01_qc_trim.sh`: `module load fastp`
-- `scripts/02_align_and_count.sh`: `module load BWA SAMtools`
+- `scripts/02_align_and_count.sh`: `module load BWA SAMtools Python Pysam`
+  (`Python`/`Pysam` are for `count_reads_per_binder.py`, called at the end
+  of that script - BWA/SAMtools alone don't cover it)
 
-One gap: `scripts/02_align_and_count.sh` also calls
-`count_reads_per_binder.py`, which needs python3 with `pysam` - not covered
-by the BWA/SAMtools modules. If your cluster doesn't have a module for
-that, build the conda/mamba environment instead:
+If your cluster doesn't have modules for one of these, `environment.yml`
+is a conda/mamba fallback covering everything except `bcl-convert` itself
+(not distributed on conda - install it separately from Illumina):
 
 ```bash
 conda env create -f environment.yml   # or: mamba env create -f environment.yml
+conda activate rcaT-binder-screen
 ```
 
-then uncomment the two `conda activate rcaT-binder-screen` lines already
-sitting (commented out) right below the `module load BWA SAMtools` line in
-`scripts/02_align_and_count.sh`. `environment.yml` only uses the
-`bioconda`/`conda-forge` channels - not `defaults`, which is the channel
-many institutions (EMBL included) restrict over Anaconda's commercial
-licensing terms - so this should work even where "conda" in general is
-flagged as an issue. If it still doesn't, see the note at the top of
-`environment.yml` (a stray `defaults` entry in `~/.condarc`, or use
-`mamba`/`micromamba` instead, which don't ship a preconfigured `defaults`
-channel at all).
+`environment.yml` only uses the `bioconda`/`conda-forge` channels - not
+`defaults`, which is the channel many institutions (EMBL included)
+restrict over Anaconda's commercial licensing terms - so this should work
+even where "conda" in general is flagged as an issue. If it still doesn't,
+see the note at the top of `environment.yml` (a stray `defaults` entry in
+`~/.condarc`, or use `mamba`/`micromamba` instead, which don't ship a
+preconfigured `defaults` channel at all).
 
 - **Analysis** (`analysis/DMS_analysis.Rmd`): R with `tidyverse` and
   `scales`:

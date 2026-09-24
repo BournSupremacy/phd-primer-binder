@@ -18,16 +18,7 @@
 #          [--out-dir results] [--min-mapq 20]
 
 set -euo pipefail
-module load BWA SAMtools
-
-# BWA/SAMtools above cover the alignment itself, but
-# scripts/count_reads_per_binder.py (called at the end of this script) also
-# needs python3 with pysam, which isn't part of either module. If your
-# cluster doesn't have a module providing that, uncomment these two lines
-# to use the conda/mamba env built from environment.yml instead - see
-# README.md "Environment setup":
-# source "$(conda info --base)/etc/profile.d/conda.sh"
-# conda activate rcaT-binder-screen
+module load BWA SAMtools Python Pysam
 
 SAMPLES_TSV="config/samples.tsv"
 REF="data/binders.fasta"

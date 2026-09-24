@@ -8,9 +8,14 @@ results/*.bam.bai
 *.fastq.gz
 *.fq.gz
 
+# SLURM job logs
+logs/*.out
+logs/*.err
+
 # keep placeholders
 !data/demux/.gitkeep
 !results/.gitkeep
+!logs/.gitkeep
 
 # R
 .Rproj.user/

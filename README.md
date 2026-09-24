@@ -43,6 +43,7 @@ scripts/
   count_reads_per_binder.py        per-binder read-pair tallying used by 02_align_and_count.sh
   simulate_test_data.py            generate synthetic reads so you can dry-run the whole thing now
 run_pipeline.sh                    convenience wrapper that runs 00->01->02 in order
+slurm/                              sbatch wrappers for the same 3 steps, chained with job dependencies - see "Running on a SLURM cluster"
 environment.yml                    conda env for the demux/QC/alignment tools
 analysis/
   DMS_analysis.Rmd                 the actual DMS-style analysis (normalisation, log2FC, replicate QC, hit table)
@@ -70,6 +71,30 @@ throughout.
    each is a standalone script with `--help`-able arguments, useful for
    understanding/debugging one step at a time.
 4. Open `analysis/DMS_analysis.Rmd` and knit it.
+
+## Running on a SLURM cluster
+
+`bcl-convert` in particular is a heavy, multi-threaded job (tens of minutes
+on real sequencer output) - don't run it on a login/interactive node.
+`slurm/` has an `sbatch` wrapper per step plus a submission script that
+chains all three with `--dependency=afterok`, so step 2 only starts once
+step 1 has actually finished successfully:
+
+```bash
+slurm/submit_pipeline.sh --run-dir /path/to/raw/MiSeqRun
+```
+
+This submits all three jobs at once (they just wait on each other in the
+queue) and prints the job IDs and log file paths
+(`logs/00_demux_<jobid>.out`, etc.) so you can `squeue -u $USER` and tail
+the logs. Add `--force` if you're re-running over a previous demux output.
+Adjust `--cpus-per-task`/`--mem`/`--time` and add your cluster's
+`--partition`/`--account` directives at the top of each `.sbatch` file -
+the defaults are generous guesses, not tuned to any specific cluster.
+
+An interactive node (`salloc`/`srun --pty bash`) is fine for quick
+debugging or running `scripts/simulate_test_data.py`, but isn't needed to
+run the real pipeline steps themselves.
 
 ## Tool requirements
 

@@ -13,6 +13,7 @@
 #     [--out-dir data/demux] [--demux bcl-convert|bcl2fastq]
 
 set -euo pipefail
+module load bcl-convert
 
 RUN_DIR=""
 SAMPLE_SHEET="config/IlluminaSampleSheet.csv"

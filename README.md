@@ -60,7 +60,35 @@ throughout.
 
 1. Copy `config/IlluminaSampleSheet_template.csv` to
    `config/IlluminaSampleSheet.csv` and fill in the real i7/i5 index
-   sequences for each of the 12 PCR-barcoded samples.
+   sequences for each of the 12 PCR-barcoded samples. A few notes on this
+   file:
+   - Keep the `Sample_ID` values identical to `sample_id` in
+     `config/samples.tsv` so downstream steps can find the right fastq
+     files automatically.
+   - Don't add comments or any other free text to this file - BCL Convert's
+     sample sheet parser doesn't support a comment syntax, and stray text
+     before `[Header]` can stop it from recognizing the sheet as v2 format
+     at all, silently falling back to legacy v1 parsing (which expects a
+     `[Data]` section instead of `[BCLConvert_Data]`) and failing with
+     "File has no valid [Data] section". Keep it as plain, valid CSV.
+   - If you're using legacy `bcl2fastq` instead of BCL Convert (not
+     recommended for MiSeq i100 output - see the comment in
+     `scripts/00_bcl_to_fastq.sh`), it expects a `[Data]` section (not
+     `[BCLConvert_Data]`) with columns
+     `Sample_ID,Sample_Name,index,index2,Sample_Project` and no
+     `[BCLConvert_Settings]` section - a different file, not a variant of
+     this template.
+   - Type both `index` (i7) and `index2` (i5) as the plain 5'->3' primer
+     sequence exactly as ordered/synthesized - do NOT manually
+     reverse-complement either one. On many older 2-channel Illumina
+     instruments (NextSeq, NovaSeq, iSeq, MiniSeq) you historically had to
+     manually enter the i5 as its reverse complement, which trips a lot of
+     people up; on the MiSeq i100 with a standard BCL Convert sample sheet
+     like this one, that flip is handled automatically from a flag in the
+     run's `RunInfo.xml`, so plain forward orientation for both indices is
+     correct. Still worth a 30-second confirmation with GeneCore before a
+     real run, since a flipped i5 sends most of your reads to
+     `Undetermined` instead of a sample.
 2. Check `config/samples.tsv` - the `sample_id` column must match the
    `Sample_ID`s in your Illumina sample sheet.
 3. Run:

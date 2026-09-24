@@ -4,10 +4,8 @@
 #SBATCH --error=logs/01_qc_%j.err
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
-#SBATCH --time=01:00:00
-# Add your cluster's partition/account if required, e.g.:
-# #SBATCH --partition=htc
-# #SBATCH --account=dorrity
+#SBATCH --time=00:30:00
+#SBATCH --partition=htc-el8
 
 # fastp over 12 samples run sequentially - light on resources, but still
 # minutes rather than seconds, so batch it rather than tying up a shell.

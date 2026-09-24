@@ -88,9 +88,10 @@ This submits all three jobs at once (they just wait on each other in the
 queue) and prints the job IDs and log file paths
 (`logs/00_demux_<jobid>.out`, etc.) so you can `squeue -u $USER` and tail
 the logs. Add `--force` if you're re-running over a previous demux output.
-Adjust `--cpus-per-task`/`--mem`/`--time` and add your cluster's
-`--partition`/`--account` directives at the top of each `.sbatch` file -
-the defaults are generous guesses, not tuned to any specific cluster.
+Resource requests are sized for this dataset (88 binders, 12 samples, a 5M
+MiSeq i100 run) on the `htc-el8` partition - bump `--cpus-per-task`/`--mem`/
+`--time` up in the relevant `.sbatch` file if you outgrow it, and add an
+`--account` directive if your cluster requires one.
 
 An interactive node (`salloc`/`srun --pty bash`) is fine for quick
 debugging or running `scripts/simulate_test_data.py`, but isn't needed to

@@ -3,11 +3,11 @@ noInducer_A	no_inducer	A	0	0	data/demux/noInducer_A/noInducer_A_R1.fastq.gz	data
 noInducer_B	no_inducer	B	0	0	data/demux/noInducer_B/noInducer_B_R1.fastq.gz	data/demux/noInducer_B/noInducer_B_R2.fastq.gz
 toxinOnly_A	toxin_only	A	0.2	0	data/demux/toxinOnly_A/toxinOnly_A_R1.fastq.gz	data/demux/toxinOnly_A/toxinOnly_A_R2.fastq.gz
 toxinOnly_B	toxin_only	B	0.2	0	data/demux/toxinOnly_B/toxinOnly_B_R1.fastq.gz	data/demux/toxinOnly_B/toxinOnly_B_R2.fastq.gz
-libOnly_0.1mM_A	library_only_0.1mM	A	0	0.1	data/demux/libOnly_0.1mM_A/libOnly_0.1mM_A_R1.fastq.gz	data/demux/libOnly_0.1mM_A/libOnly_0.1mM_A_R2.fastq.gz
-libOnly_0.1mM_B	library_only_0.1mM	B	0	0.1	data/demux/libOnly_0.1mM_B/libOnly_0.1mM_B_R1.fastq.gz	data/demux/libOnly_0.1mM_B/libOnly_0.1mM_B_R2.fastq.gz
+libOnly_0_1mM_A	library_only_0.1mM	A	0	0.1	data/demux/libOnly_0_1mM_A/libOnly_0_1mM_A_R1.fastq.gz	data/demux/libOnly_0_1mM_A/libOnly_0_1mM_A_R2.fastq.gz
+libOnly_0_1mM_B	library_only_0.1mM	B	0	0.1	data/demux/libOnly_0_1mM_B/libOnly_0_1mM_B_R1.fastq.gz	data/demux/libOnly_0_1mM_B/libOnly_0_1mM_B_R2.fastq.gz
 libOnly_1mM_A	library_only_1mM	A	0	1	data/demux/libOnly_1mM_A/libOnly_1mM_A_R1.fastq.gz	data/demux/libOnly_1mM_A/libOnly_1mM_A_R2.fastq.gz
 libOnly_1mM_B	library_only_1mM	B	0	1	data/demux/libOnly_1mM_B/libOnly_1mM_B_R1.fastq.gz	data/demux/libOnly_1mM_B/libOnly_1mM_B_R2.fastq.gz
-toxLib_0.1mM_A	toxin_plus_library_0.1mM	A	0.2	0.1	data/demux/toxLib_0.1mM_A/toxLib_0.1mM_A_R1.fastq.gz	data/demux/toxLib_0.1mM_A/toxLib_0.1mM_A_R2.fastq.gz
-toxLib_0.1mM_B	toxin_plus_library_0.1mM	B	0.2	0.1	data/demux/toxLib_0.1mM_B/toxLib_0.1mM_B_R1.fastq.gz	data/demux/toxLib_0.1mM_B/toxLib_0.1mM_B_R2.fastq.gz
+toxLib_0_1mM_A	toxin_plus_library_0.1mM	A	0.2	0.1	data/demux/toxLib_0_1mM_A/toxLib_0_1mM_A_R1.fastq.gz	data/demux/toxLib_0_1mM_A/toxLib_0_1mM_A_R2.fastq.gz
+toxLib_0_1mM_B	toxin_plus_library_0.1mM	B	0.2	0.1	data/demux/toxLib_0_1mM_B/toxLib_0_1mM_B_R1.fastq.gz	data/demux/toxLib_0_1mM_B/toxLib_0_1mM_B_R2.fastq.gz
 toxLib_1mM_A	toxin_plus_library_1mM	A	0.2	1	data/demux/toxLib_1mM_A/toxLib_1mM_A_R1.fastq.gz	data/demux/toxLib_1mM_A/toxLib_1mM_A_R2.fastq.gz
 toxLib_1mM_B	toxin_plus_library_1mM	B	0.2	1	data/demux/toxLib_1mM_B/toxLib_1mM_B_R1.fastq.gz	data/demux/toxLib_1mM_B/toxLib_1mM_B_R2.fastq.gz

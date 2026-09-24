@@ -1,12 +1,25 @@
 #!/usr/bin/env bash
+#SBATCH --job-name=binder-qc
+#SBATCH --output=logs/01_qc_%j.out
+#SBATCH --error=logs/01_qc_%j.err
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G
+#SBATCH --time=00:30:00
+#SBATCH --partition=htc-el8
+#
 # Adapter/quality-trim each sample's paired-end reads with fastp and write a
 # per-sample HTML/JSON QC report. This is a light-touch step - we are not
 # trying to merge/stitch R1+R2 (see README for why that's unnecessary here),
 # just removing adapter read-through and low-quality tails before alignment.
 #
+# Runs standalone (bash scripts/01_qc_trim.sh) or as a SLURM job
+# (sbatch scripts/01_qc_trim.sh) - the #SBATCH lines above are ordinary
+# comments to bash and are only read by sbatch.
+#
 # Usage: scripts/01_qc_trim.sh [--samples config/samples.tsv] [--out-dir data/qc_trimmed]
 
 set -euo pipefail
+mkdir -p logs
 module load fastp
 
 SAMPLES_TSV="config/samples.tsv"

@@ -37,14 +37,14 @@ data/
   binders.fasta                   the 88 designed RcaT binder sequences - the alignment reference used throughout
   demux/                          per-sample demultiplexed fastq.gz land here
 scripts/
-  00_bcl_to_fastq.sh               demultiplex raw sequencer output -> data/demux/<sample_id>/
-  01_qc_trim.sh                    fastp adapter/quality trimming
-  02_align_and_count.sh            bwa mem alignment to data/binders.fasta + counting
+  00_bcl_to_fastq.sh               demultiplex raw sequencer output -> data/demux/<sample_id>/ (also an sbatch script - see below)
+  01_qc_trim.sh                    fastp adapter/quality trimming (also an sbatch script)
+  02_align_and_count.sh            bwa mem alignment to data/binders.fasta + counting (also an sbatch script)
   count_reads_per_binder.py        per-binder read-pair tallying used by 02_align_and_count.sh
   simulate_test_data.py            generate synthetic reads so you can dry-run the whole thing now
 run_pipeline.sh                    convenience wrapper that runs 00->01->02 in order
-slurm/                              sbatch wrappers for the same 3 steps, chained with job dependencies - see "Running on a SLURM cluster"
-environment.yml                    conda env for the demux/QC/alignment tools
+slurm/submit_pipeline.sh           submits the same 3 scripts via sbatch, chained with job dependencies - see "Running on a SLURM cluster"
+environment.yml                    conda env for the demux/QC/alignment tools (fallback if your cluster has no modules for them)
 analysis/
   DMS_analysis.Rmd                 the actual DMS-style analysis (normalisation, log2FC, replicate QC, hit table)
 results/                           binder_counts.tsv and everything the R notebook produces (gitignored except final CSV)
@@ -75,10 +75,21 @@ throughout.
 ## Running on a SLURM cluster
 
 `bcl-convert` in particular is a heavy, multi-threaded job (tens of minutes
-on real sequencer output) - don't run it on a login/interactive node.
-`slurm/` has an `sbatch` wrapper per step plus a submission script that
-chains all three with `--dependency=afterok`, so step 2 only starts once
-step 1 has actually finished successfully:
+on real sequencer output) - don't run it on a login/interactive node. Each
+of `scripts/00_bcl_to_fastq.sh`, `scripts/01_qc_trim.sh`, and
+`scripts/02_align_and_count.sh` carries its own `#SBATCH` directives right
+after the shebang, so the same file works two ways:
+
+```bash
+bash scripts/00_bcl_to_fastq.sh --run-dir /path/to/raw/MiSeqRun    # runs directly
+sbatch scripts/00_bcl_to_fastq.sh --run-dir /path/to/raw/MiSeqRun  # submits as a SLURM job
+```
+
+(`#SBATCH` lines are just `#`-comments to bash, so running a script directly
+ignores them - only `sbatch` reads them.)
+
+To run all three chained together with `--dependency=afterok` (so step 2
+only starts once step 1 has actually finished successfully), use:
 
 ```bash
 slurm/submit_pipeline.sh --run-dir /path/to/raw/MiSeqRun
@@ -90,8 +101,8 @@ queue) and prints the job IDs and log file paths
 the logs. Add `--force` if you're re-running over a previous demux output.
 Resource requests are sized for this dataset (88 binders, 12 samples, a 5M
 MiSeq i100 run) on the `htc-el8` partition - bump `--cpus-per-task`/`--mem`/
-`--time` up in the relevant `.sbatch` file if you outgrow it, and add an
-`--account` directive if your cluster requires one.
+`--time` up in the relevant script's `#SBATCH` lines if you outgrow it, and
+add an `--account` directive if your cluster requires one.
 
 An interactive node (`salloc`/`srun --pty bash`) is fine for quick
 debugging or running `scripts/simulate_test_data.py`, but isn't needed to

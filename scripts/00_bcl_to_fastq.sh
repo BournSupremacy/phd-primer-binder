@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+#SBATCH --job-name=binder-demux
+#SBATCH --output=logs/00_demux_%j.out
+#SBATCH --error=logs/00_demux_%j.err
+#SBATCH --cpus-per-task=8
+#SBATCH --time=01:00:00
+#SBATCH --partition=htc-el8
+#
 # Demultiplex the MiSeq i100 run into per-sample paired-end fastq.gz files.
 #
 # The MiSeq i100 series writes base calls in a newer format than classic
@@ -6,6 +13,13 @@
 # BCL Convert, which we use by default. If you specifically need legacy
 # bcl2fastq (e.g. an older run), pass --demux bcl2fastq - but check it
 # actually supports your RunInfo/RTA version first.
+#
+# Runs standalone (bash scripts/00_bcl_to_fastq.sh ...) or as a SLURM job
+# (sbatch scripts/00_bcl_to_fastq.sh ...) - the #SBATCH lines above are
+# ordinary comments to bash and are only read by sbatch. This is the
+# heaviest, most multi-threaded step in the pipeline - the one you most
+# want off a login node. No --mem set (standard per-cpu default); bump
+# cpus-per-task/time up if you outgrow a 5M-read MiSeq i100 run.
 #
 # Usage:
 #   scripts/00_bcl_to_fastq.sh --run-dir /path/to/MiSeqRun \
@@ -19,6 +33,7 @@
 # after fixing an index in the sample sheet) is expected.
 
 set -euo pipefail
+mkdir -p logs
 module load bcl-convert
 
 RUN_DIR=""

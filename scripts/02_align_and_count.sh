@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+#SBATCH --job-name=binder-align
+#SBATCH --output=logs/02_align_%j.out
+#SBATCH --error=logs/02_align_%j.err
+#SBATCH --cpus-per-task=4
+#SBATCH --time=00:30:00
+#SBATCH --partition=htc-el8
+#
 # Align each sample's trimmed paired-end reads to the panel of 88 known binder
 # sequences and produce a per-sample, per-binder read count.
 #
@@ -13,11 +20,17 @@
 #   mutations across the whole amplicon) - we don't need that here since we're
 #   just counting abundance against a small, known reference panel.
 #
+# Runs standalone (bash scripts/02_align_and_count.sh ...) or as a SLURM job
+# (sbatch scripts/02_align_and_count.sh ...) - the #SBATCH lines above are
+# ordinary comments to bash and are only read by sbatch. No --mem set
+# (standard per-cpu default).
+#
 # Usage: scripts/02_align_and_count.sh [--samples config/samples.tsv]
 #          [--ref data/binders.fasta] [--trimmed-dir data/qc_trimmed]
 #          [--out-dir results] [--min-mapq 20]
 
 set -euo pipefail
+mkdir -p logs
 module load BWA SAMtools Python Pysam
 
 SAMPLES_TSV="config/samples.tsv"

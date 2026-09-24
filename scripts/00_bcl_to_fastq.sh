@@ -10,7 +10,13 @@
 # Usage:
 #   scripts/00_bcl_to_fastq.sh --run-dir /path/to/MiSeqRun \
 #     [--sample-sheet config/IlluminaSampleSheet.csv] \
-#     [--out-dir data/demux] [--demux bcl-convert|bcl2fastq]
+#     [--out-dir data/demux] [--demux bcl-convert|bcl2fastq] [--force]
+#
+# --force: bcl-convert refuses to write into an output folder that already
+# exists (a safety check against accidentally overwriting someone else's
+# results). Pass --force to let it overwrite - safe here since demux output
+# is fully reproducible from the raw run + sample sheet, so re-running (e.g.
+# after fixing an index in the sample sheet) is expected.
 
 set -euo pipefail
 module load bcl-convert
@@ -19,6 +25,7 @@ RUN_DIR=""
 SAMPLE_SHEET="config/IlluminaSampleSheet.csv"
 OUT_DIR="data/demux"
 DEMUX_TOOL="bcl-convert"
+FORCE=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,6 +33,7 @@ while [[ $# -gt 0 ]]; do
     --sample-sheet) SAMPLE_SHEET="$2"; shift 2 ;;
     --out-dir) OUT_DIR="$2"; shift 2 ;;
     --demux) DEMUX_TOOL="$2"; shift 2 ;;
+    --force) FORCE=true; shift ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
@@ -39,7 +47,11 @@ if [[ ! -f "$SAMPLE_SHEET" ]]; then
   exit 1
 fi
 
-mkdir -p "$OUT_DIR"
+# Deliberately NOT mkdir-ing $OUT_DIR here - bcl-convert creates it itself
+# and errors out if it already exists (see --force above).
+
+bcl_convert_args=()
+$FORCE && bcl_convert_args+=(--force)
 
 if [[ "$DEMUX_TOOL" == "bcl-convert" ]]; then
   echo "Running BCL Convert..."
@@ -47,7 +59,8 @@ if [[ "$DEMUX_TOOL" == "bcl-convert" ]]; then
     --bcl-input-directory "$RUN_DIR" \
     --output-directory "$OUT_DIR" \
     --sample-sheet "$SAMPLE_SHEET" \
-    --bcl-sampleproject-subdirectories true
+    --bcl-sampleproject-subdirectories true \
+    "${bcl_convert_args[@]}"
 elif [[ "$DEMUX_TOOL" == "bcl2fastq" ]]; then
   echo "Running legacy bcl2fastq (make sure your sample sheet uses the [Data] format, not [BCLConvert_Data])..."
   bcl2fastq \

@@ -8,6 +8,17 @@
 
 set -euo pipefail
 
+# This step needs fastp on PATH. Uncomment ONE of the following depending on
+# what your cluster provides - see README.md "Environment setup".
+#
+# Option A - cluster environment module (check the exact name/case first
+# with `module avail fastp`):
+# module load fastp
+#
+# Option B - conda/mamba env built from environment.yml:
+# source "$(conda info --base)/etc/profile.d/conda.sh"
+# conda activate rcaT-binder-screen
+
 SAMPLES_TSV="config/samples.tsv"
 OUT_DIR="data/qc_trimmed"
 

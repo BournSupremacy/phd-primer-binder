@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Align each sample's trimmed paired-end reads to the panel of 96 known binder
+# Align each sample's trimmed paired-end reads to the panel of 88 known binder
 # sequences and produce a per-sample, per-binder read count.
 #
 # Why plain paired-end alignment and not read-stitching:
@@ -7,7 +7,7 @@
 #   the same reference contig in FR orientation - it does NOT require the two
 #   mates to overlap. So even though our binders (>300bp) are longer than the
 #   R1+R2 combined footprint (300bp) and the mates never touch in the middle,
-#   bwa mem still correctly identifies which of the 96 binder sequences a read
+#   bwa mem still correctly identifies which of the 88 binder sequences a read
 #   pair came from. Stitching (DiMSum/PEAR-style) is only needed when you must
 #   reconstruct one full-length consensus read per molecule (e.g. to call
 #   mutations across the whole amplicon) - we don't need that here since we're
@@ -18,6 +18,18 @@
 #          [--out-dir results] [--min-mapq 20]
 
 set -euo pipefail
+
+# This step needs bwa, samtools, and python3 with pysam on PATH. Uncomment
+# ONE of the following depending on what your cluster provides - see
+# README.md "Environment setup".
+#
+# Option A - cluster environment modules (check exact names/case first with
+# `module avail bwa samtools python`):
+# module load BWA SAMtools Python
+#
+# Option B - conda/mamba env built from environment.yml:
+# source "$(conda info --base)/etc/profile.d/conda.sh"
+# conda activate rcaT-binder-screen
 
 SAMPLES_TSV="config/samples.tsv"
 REF="data/binders.fasta"

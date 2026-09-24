@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.width =
 
 ## 0. What this notebook does
 
-We designed ~96 candidate binders against the RcaT toxin. Cells carrying the
+We designed 88 candidate binders against the RcaT toxin. Cells carrying the
 pooled binder library were grown under 6 conditions (no inducer, toxin-only,
 library-only at two IPTG levels, and toxin+library at two IPTG levels), each
 in duplicate (A/B). RcaT kills the cell unless it's bound/inhibited, so **a

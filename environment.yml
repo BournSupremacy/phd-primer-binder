@@ -2,6 +2,15 @@
 #   conda env create -f environment.yml
 #   conda activate rcaT-binder-screen
 #
+# Only bioconda/conda-forge below, deliberately - no "defaults"/"main"
+# channel, which is the one many institutions (EMBL included) block or
+# restrict over Anaconda Inc.'s commercial licensing terms. If env creation
+# still tries to reach a blocked channel, check `conda config --show
+# channels` for a "defaults" entry sneaking in from ~/.condarc, or just use
+# mamba/micromamba instead of conda - same command, same environment.yml,
+# and they don't carry a preconfigured "defaults" channel at all:
+#   mamba env create -f environment.yml
+#
 # bcl-convert is NOT distributed on conda - install it separately from
 # Illumina (https://support.illumina.com/sequencing/sequencing_software/bcl-convert.html).
 # It runs fine alongside this env; it doesn't need to be inside it.

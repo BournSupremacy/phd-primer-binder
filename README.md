@@ -99,32 +99,32 @@ run the real pipeline steps themselves.
 
 ## Environment setup
 
-Each pipeline script needs certain tools on `PATH` before it runs - there's
-a commented-out block right after `set -euo pipefail` in
-`scripts/01_qc_trim.sh` and `scripts/02_align_and_count.sh` (and a real
-`module load bcl-convert` line already in `scripts/00_bcl_to_fastq.sh`) -
-uncomment whichever option applies to you there. Two ways to get the tools:
+Each script loads what it needs via cluster environment modules, right
+after `set -euo pipefail`:
 
-1. **Cluster environment modules**, if your cluster provides them (this is
-   how `bcl-convert` itself is loaded already) - check with
-   `module avail bwa samtools fastp` and uncomment/adjust the `module load`
-   line for the matching step.
-2. **A conda/mamba environment built from `environment.yml`**, if modules
-   aren't available:
-   ```bash
-   conda env create -f environment.yml   # or: mamba env create -f environment.yml
-   ```
-   then uncomment the `conda activate rcaT-binder-screen` lines in the same
-   place. `environment.yml` only uses the `bioconda`/`conda-forge` channels
-   - not `defaults`, which is the channel many institutions (EMBL included)
-   restrict over Anaconda's commercial licensing terms - so this should work
-   even where "conda" in general is flagged as an issue. If it still doesn't,
-   see the note at the top of `environment.yml` (a stray `defaults` entry in
-   `~/.condarc`, or use `mamba`/`micromamba` instead, which don't ship a
-   preconfigured `defaults` channel at all).
+- `scripts/00_bcl_to_fastq.sh`: `module load bcl-convert`
+- `scripts/01_qc_trim.sh`: `module load fastp`
+- `scripts/02_align_and_count.sh`: `module load BWA SAMtools`
 
-Either way, `bcl-convert` itself isn't on conda - install it separately from
-Illumina if you don't have it as a module.
+One gap: `scripts/02_align_and_count.sh` also calls
+`count_reads_per_binder.py`, which needs python3 with `pysam` - not covered
+by the BWA/SAMtools modules. If your cluster doesn't have a module for
+that, build the conda/mamba environment instead:
+
+```bash
+conda env create -f environment.yml   # or: mamba env create -f environment.yml
+```
+
+then uncomment the two `conda activate rcaT-binder-screen` lines already
+sitting (commented out) right below the `module load BWA SAMtools` line in
+`scripts/02_align_and_count.sh`. `environment.yml` only uses the
+`bioconda`/`conda-forge` channels - not `defaults`, which is the channel
+many institutions (EMBL included) restrict over Anaconda's commercial
+licensing terms - so this should work even where "conda" in general is
+flagged as an issue. If it still doesn't, see the note at the top of
+`environment.yml` (a stray `defaults` entry in `~/.condarc`, or use
+`mamba`/`micromamba` instead, which don't ship a preconfigured `defaults`
+channel at all).
 
 - **Analysis** (`analysis/DMS_analysis.Rmd`): R with `tidyverse` and
   `scales`:

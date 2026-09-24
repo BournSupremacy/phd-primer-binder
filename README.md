@@ -27,52 +27,6 @@ it contributes to the pool.
 Sequencing: Illumina MiSeq i100 5M, 150bp paired-end, dual PCR barcoding for
 demultiplexing.
 
-This is deliberately much simpler than
-[DiMSum](https://github.com/lehner-lab/DiMSum): DiMSum is built to reconstruct
-and call mutations across a whole deep-mutational-scanning library from
-overlapping paired-end reads. Here the reference panel is a small set of
-**known, fixed sequences** (88 of them) - we just need to count which one
-each read pair came from, so the pipeline is: demux -> trim -> align to the
-88 binders -> count -> a plain R Markdown DMS-style comparison. No merging,
-no variant calling.
-
-## Your two questions, answered
-
-**"Is it a problem that some binders are >300bp and paired 150bp reads can't
-stitch to cover the full length?"**
-
-No - and you don't actually need to stitch at all. Overlap-stitching
-(what DiMSum/PEAR/FLASH do) exists to reconstruct one full-length consensus
-read per molecule, which you need if you're calling mutations across an
-entire amplicon. Here, a standard paired-end aligner (we use `bwa mem`)
-places R1 and R2 independently onto the same reference contig in FR
-orientation - it never requires the mates to overlap or even come close;
-that's the whole point of "paired-end" alignment (it's exactly how routine
-WGS/RNA-seq libraries with fragments much longer than 2x read length are
-handled). So for binders longer than 300bp, R1 anchors the 5' end and R2
-(reverse-complemented) anchors the 3' end, with an unsequenced gap in the
-middle - `bwa mem` still correctly identifies which of the 88 references
-the pair came from, and `scripts/count_reads_per_binder.py` requires both
-mates to agree on the same reference before counting a pair (see
-`results/binder_counts_qc.tsv` for how often they don't).
-
-The one thing you genuinely give up for binders longer than ~300bp: you
-aren't verifying the *untested middle* of the sequence (e.g. a cloning
-error, partial deletion, or recombination event confined to the middle
-wouldn't be caught from the two ends alone). Worth a sentence in your
-methods, but it doesn't affect the relative-abundance readout this screen
-is built around.
-
-**bcl2fastq vs. something else?**
-
-The MiSeq **i100** series writes base calls in a format bcl2fastq2 predates
-and doesn't reliably support. Illumina's supported demultiplexer for it is
-**BCL Convert**, which uses an almost identical dual-index sample-sheet
-format - `scripts/00_bcl_to_fastq.sh` defaults to it (`--demux bcl-convert`)
-and falls back to legacy `bcl2fastq` only if you explicitly ask for it
-(`--demux bcl2fastq`), with a note about the sample-sheet section-name
-difference between the two.
-
 ## Repository layout
 
 ```
@@ -97,25 +51,11 @@ results/                           binder_counts.tsv and everything the R notebo
 
 ## Running it
 
-### 0. Try it now with simulated data (no wet-lab data needed yet)
-
-```bash
-python3 scripts/simulate_test_data.py     # writes synthetic reads for the real binders to data/demux/*/*.fastq.gz
-scripts/01_qc_trim.sh
-scripts/02_align_and_count.sh
-```
-
-or in one go: `./run_pipeline.sh --simulate`. Then open
-`analysis/DMS_analysis.Rmd` in RStudio and knit it - this is a complete,
-working end-to-end example with a handful of "true" binders simulated to be
-enriched, useful for the students to see what a real hit should look like
-before real sequencing data comes back.
-
 ### 1. With real sequencing data
 
 `data/binders.fasta` already contains the 88 designed binder sequences
 (headers = their design names) and is used as the alignment reference
-throughout - nothing to do there.
+throughout.
 
 1. Copy `config/IlluminaSampleSheet_template.csv` to
    `config/IlluminaSampleSheet.csv` and fill in the real i7/i5 index

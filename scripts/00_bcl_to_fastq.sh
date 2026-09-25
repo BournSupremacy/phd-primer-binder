@@ -108,8 +108,14 @@ find_with_retry() {
 }
 
 echo "Renaming fastq files in $OUT_DIR/..."
-while IFS=$'\t' read -r sample_id _condition _rep _ara _iptg _r1 _r2; do
-  [[ "$sample_id" == "sample_id" ]] && continue
+# mapfile (not `while read < file`) so a samples.tsv missing a trailing
+# newline on its last line doesn't silently drop that last sample - `read`
+# reports failure on a final line with no newline, which would otherwise
+# make the while-loop condition false before the body ever runs for it.
+mapfile -t sample_lines < config/samples.tsv
+for line in "${sample_lines[@]}"; do
+  IFS=$'\t' read -r sample_id _condition _rep _ara _iptg _r1 _r2 <<< "$line"
+  [[ "$sample_id" == "sample_id" || -z "$sample_id" ]] && continue
   found_r1=$(find_with_retry "${sample_id}_S*_R1_001.fastq.gz")
   found_r2=$(find_with_retry "${sample_id}_S*_R2_001.fastq.gz")
   if [[ -z "$found_r1" || -z "$found_r2" ]]; then
@@ -119,6 +125,6 @@ while IFS=$'\t' read -r sample_id _condition _rep _ara _iptg _r1 _r2; do
   mv "$found_r1" "$OUT_DIR/${sample_id}_R1.fastq.gz"
   mv "$found_r2" "$OUT_DIR/${sample_id}_R2.fastq.gz"
   echo "  $sample_id -> $OUT_DIR/${sample_id}_R{1,2}.fastq.gz"
-done < config/samples.tsv
+done
 
 echo "Demultiplexing done. Fastq files are under $OUT_DIR/"

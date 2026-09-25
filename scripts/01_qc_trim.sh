@@ -35,7 +35,14 @@ done
 
 mkdir -p "$OUT_DIR"
 
-tail -n +2 "$SAMPLES_TSV" | while IFS=$'\t' read -r sample_id _condition _rep _ara _iptg r1 r2; do
+# mapfile (not `while read < file`/`| while read`) so a samples.tsv missing
+# a trailing newline on its last line doesn't silently drop that last
+# sample - `read` reports failure on a final line with no newline, which
+# would otherwise make the while-loop condition false before the body ever
+# runs for it.
+mapfile -t sample_lines < <(tail -n +2 "$SAMPLES_TSV")
+for line in "${sample_lines[@]}"; do
+  IFS=$'\t' read -r sample_id _condition _rep _ara _iptg r1 r2 <<< "$line"
   [[ -z "$sample_id" ]] && continue
   if [[ ! -f "$r1" || ! -f "$r2" ]]; then
     echo "WARNING: missing fastq for $sample_id ($r1 / $r2) - skipping. Run 00_bcl_to_fastq.sh first." >&2

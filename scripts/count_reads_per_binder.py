@@ -2,12 +2,21 @@
 """Tally per-binder read-pair counts from aligned BAM files.
 
 For each sample BAM (aligned with bwa mem against data/binders.fasta), count
-one "hit" per read pair whose primary alignment is properly paired, mapped
-with MAPQ >= --min-mapq, and where R1 and R2 agree on the same reference
-sequence (binder). Read pairs that don't meet these criteria are tallied
-separately as QC counters (unmapped, low MAPQ, mate mismatch) so you can spot
-samples with a lot of ambiguous/multi-mapping reads (e.g. if some binders
-share long identical scaffold regions).
+one "hit" per read pair that's mapped with MAPQ >= --min-mapq and where R1
+and R2 agree on the same reference sequence (binder). Read pairs that don't
+meet these criteria are tallied separately as QC counters (unmapped, low
+MAPQ, mate mismatch) so you can spot samples with a lot of ambiguous/multi-
+mapping reads (e.g. if some binders share long identical scaffold regions).
+
+Deliberately NOT requiring bwa's "properly paired" SAM flag: that flag
+depends on an insert-size window bwa estimates from the whole run, which
+doesn't fit well here since the 88 binders span a wide length range
+(156-450bp) - a pair correctly identifying a short binder can get flagged
+"improper" purely because its effective insert size looks nothing like a
+pair hitting a much longer binder, even though the actual identification
+(same reference, confident MAPQ) is completely correct. `not_properly_paired`
+is still recorded as an informational QC counter, just not used to exclude
+pairs from the count.
 
 Output: a single long-format TSV with columns
     sample_id  binder_id  count
@@ -47,8 +56,7 @@ def count_bam(bam_path, min_mapq):
                 qc["unmapped"] += 1
                 continue
             if not read.is_proper_pair:
-                qc["not_properly_paired"] += 1
-                continue
+                qc["not_properly_paired"] += 1  # informational only, see module docstring
             if read.mapping_quality < min_mapq:
                 qc["low_mapq"] += 1
                 continue

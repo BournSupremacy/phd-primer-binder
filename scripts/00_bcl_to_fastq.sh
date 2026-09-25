@@ -92,11 +92,27 @@ fi
 # inside a per-sample-project subfolder). Reorganise into the flat
 # data/demux/<sample_id>/<sample_id>_R{1,2}.fastq.gz layout that
 # config/samples.tsv and the rest of the pipeline expect.
+#
+# find_with_retry: on shared/network filesystems, a file bcl-convert just
+# finished writing can take a moment to become visible to a fresh `find` -
+# retry a few times with a short sleep before giving up, rather than
+# leaving the last-written sample's fastq.gz stranded at the top level.
+find_with_retry() {
+  local pattern="$1"
+  local hit=""
+  for _ in 1 2 3 4 5; do
+    hit=$(find "$OUT_DIR" -maxdepth 3 -name "$pattern" | head -n1 || true)
+    [[ -n "$hit" ]] && break
+    sleep 2
+  done
+  echo "$hit"
+}
+
 echo "Reorganising fastq files into $OUT_DIR/<sample_id>/..."
 while IFS=$'\t' read -r sample_id _condition _rep _ara _iptg _r1 _r2; do
   [[ "$sample_id" == "sample_id" ]] && continue
-  found_r1=$(find "$OUT_DIR" -maxdepth 3 -name "${sample_id}_S*_R1_001.fastq.gz" | head -n1 || true)
-  found_r2=$(find "$OUT_DIR" -maxdepth 3 -name "${sample_id}_S*_R2_001.fastq.gz" | head -n1 || true)
+  found_r1=$(find_with_retry "${sample_id}_S*_R1_001.fastq.gz")
+  found_r2=$(find_with_retry "${sample_id}_S*_R2_001.fastq.gz")
   if [[ -z "$found_r1" || -z "$found_r2" ]]; then
     echo "  WARNING: could not find demuxed fastq for sample '$sample_id' - check the sample sheet Sample_ID matches config/samples.tsv" >&2
     continue

@@ -35,9 +35,9 @@ config/
   IlluminaSampleSheet_template.csv template BCL Convert sample sheet for demux (fill in real indices)
 data/
   binders.fasta                   the 88 designed RcaT binder sequences - the alignment reference used throughout
-  demux/                          per-sample demultiplexed fastq.gz land here
+  demux/                          demultiplexed fastq.gz land here, flat, as <sample_id>_R{1,2}.fastq.gz
 scripts/
-  00_bcl_to_fastq.sh               demultiplex raw sequencer output -> data/demux/<sample_id>/ (also an sbatch script - see below)
+  00_bcl_to_fastq.sh               demultiplex raw sequencer output -> data/demux/ (also an sbatch script - see below)
   01_qc_trim.sh                    fastp adapter/quality trimming (also an sbatch script)
   02_align_and_count.sh            bwa mem alignment to data/binders.fasta + counting (also an sbatch script)
   count_reads_per_binder.py        per-binder read-pair tallying used by 02_align_and_count.sh

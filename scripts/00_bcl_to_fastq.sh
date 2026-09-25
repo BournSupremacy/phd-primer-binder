@@ -74,7 +74,6 @@ if [[ "$DEMUX_TOOL" == "bcl-convert" ]]; then
     --bcl-input-directory "$RUN_DIR" \
     --output-directory "$OUT_DIR" \
     --sample-sheet "$SAMPLE_SHEET" \
-    --bcl-sampleproject-subdirectories true \
     "${bcl_convert_args[@]}"
 elif [[ "$DEMUX_TOOL" == "bcl2fastq" ]]; then
   echo "Running legacy bcl2fastq (make sure your sample sheet uses the [Data] format, not [BCLConvert_Data])..."
@@ -88,10 +87,10 @@ else
   exit 1
 fi
 
-# Both tools name output files <Sample_ID>_S<N>_R{1,2}_001.fastq.gz (optionally
-# inside a per-sample-project subfolder). Reorganise into the flat
-# data/demux/<sample_id>/<sample_id>_R{1,2}.fastq.gz layout that
-# config/samples.tsv and the rest of the pipeline expect.
+# Both tools name output files <Sample_ID>_S<N>_R{1,2}_001.fastq.gz, all
+# together in $OUT_DIR (no per-sample subdirectories). Rename into the flat
+# data/demux/<sample_id>_R{1,2}.fastq.gz layout that config/samples.tsv and
+# the rest of the pipeline expect.
 #
 # find_with_retry: on shared/network filesystems, a file bcl-convert just
 # finished writing can take a moment to become visible to a fresh `find` -
@@ -108,7 +107,7 @@ find_with_retry() {
   echo "$hit"
 }
 
-echo "Reorganising fastq files into $OUT_DIR/<sample_id>/..."
+echo "Renaming fastq files in $OUT_DIR/..."
 while IFS=$'\t' read -r sample_id _condition _rep _ara _iptg _r1 _r2; do
   [[ "$sample_id" == "sample_id" ]] && continue
   found_r1=$(find_with_retry "${sample_id}_S*_R1_001.fastq.gz")
@@ -117,11 +116,9 @@ while IFS=$'\t' read -r sample_id _condition _rep _ara _iptg _r1 _r2; do
     echo "  WARNING: could not find demuxed fastq for sample '$sample_id' - check the sample sheet Sample_ID matches config/samples.tsv" >&2
     continue
   fi
-  dest="$OUT_DIR/$sample_id"
-  mkdir -p "$dest"
-  mv "$found_r1" "$dest/${sample_id}_R1.fastq.gz"
-  mv "$found_r2" "$dest/${sample_id}_R2.fastq.gz"
-  echo "  $sample_id -> $dest/"
+  mv "$found_r1" "$OUT_DIR/${sample_id}_R1.fastq.gz"
+  mv "$found_r2" "$OUT_DIR/${sample_id}_R2.fastq.gz"
+  echo "  $sample_id -> $OUT_DIR/${sample_id}_R{1,2}.fastq.gz"
 done < config/samples.tsv
 
-echo "Demultiplexing done. Per-sample fastq files are under $OUT_DIR/"
+echo "Demultiplexing done. Fastq files are under $OUT_DIR/"

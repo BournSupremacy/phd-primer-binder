@@ -6,7 +6,7 @@ It creates:
   - data/binders.fasta                (if it doesn't already exist): N synthetic
     "binder" sequences of realistic length (300-450bp), a handful of which are
     designated as true strong RcaT binders.
-  - data/demux/<sample_id>/<sample_id>_R{1,2}.fastq.gz for every sample in
+  - data/demux/<sample_id>_R{1,2}.fastq.gz for every sample in
     config/samples.tsv, with per-binder relative abundances that reflect the
     expected biology:
       * no_inducer / library_only (any IPTG, no toxin): all binders ~uniform
@@ -172,8 +172,7 @@ def main():
         probs = relative_abundance(binder_ids, true_binder_ids, condition, iptg, np_rng)
         counts = np_rng.multinomial(args.reads_per_sample, probs)
 
-        sample_dir = os.path.join(DEMUX_DIR, sample_id)
-        os.makedirs(sample_dir, exist_ok=True)
+        os.makedirs(DEMUX_DIR, exist_ok=True)
 
         pairs = []
         for binder_id, n in zip(binder_ids, counts):
@@ -182,8 +181,8 @@ def main():
             pairs.extend(simulate_reads_for_binder(binders[binder_id], int(n), args.error_rate, rng, np_rng))
         np_rng.shuffle(np.arange(len(pairs)))  # cheap shuffle of order isn't essential; skip heavy shuffle for speed
 
-        write_fastq_pair(sample_dir, sample_id, pairs, rng)
-        print(f"  {sample_id} ({condition}, IPTG={iptg}mM): {len(pairs)} read pairs -> {sample_dir}/")
+        write_fastq_pair(DEMUX_DIR, sample_id, pairs, rng)
+        print(f"  {sample_id} ({condition}, IPTG={iptg}mM): {len(pairs)} read pairs -> {DEMUX_DIR}/")
 
     print("\nSimulated data ready. You can now run:")
     print("  scripts/01_qc_trim.sh")

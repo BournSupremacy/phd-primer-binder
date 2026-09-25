@@ -10,6 +10,7 @@ Read2Cycles,150
 [BCLConvert_Settings]
 AdapterRead1,CTGTCTCTTATACACATCT
 AdapterRead2,CTGTCTCTTATACACATCT
+BarcodeMismatchesIndex1,1
 
 [BCLConvert_Data]
 Sample_ID,index,index2

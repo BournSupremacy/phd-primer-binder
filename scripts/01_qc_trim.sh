@@ -51,8 +51,7 @@ tail -n +2 "$SAMPLES_TSV" | while IFS=$'\t' read -r sample_id _condition _rep _a
     --detect_adapter_for_pe \
     --json "$sample_out/${sample_id}_fastp.json" \
     --html "$sample_out/${sample_id}_fastp.html" \
-    --thread 4 \
-    --quiet
+    --thread 4
 done
 
 echo "QC/trimming done. Trimmed reads and reports are under $OUT_DIR/"

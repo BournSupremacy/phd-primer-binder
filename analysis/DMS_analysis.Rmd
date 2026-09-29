@@ -58,6 +58,19 @@ counts_long <- counts_long %>%
   left_join(samples %>% select(sample_id, condition, replicate, ara_pct, iptg_mM),
             by = "sample_id")
 
+# Section 5 onward compares replicate A against replicate B directly - only
+# possible if both actually exist in this run (e.g. not yet true for a
+# single-replicate test run before the full experiment). Everything before
+# Section 5 works identically either way, since averaging one value is a
+# no-op.
+has_replicates <- all(c("A", "B") %in% unique(samples$replicate))
+if (!has_replicates) {
+  message("Only replicate(s) ", paste(unique(samples$replicate), collapse = ", "),
+          " present - Section 5's A-vs-B consistency checks will be skipped, and the ",
+          "final hit table will be marked provisional (not replicate-validated). ",
+          "Re-run this notebook once both replicates exist.")
+}
+
 head(counts_long)
 ```
 
@@ -201,23 +214,29 @@ complexity/correlation) and on the derived log2FC (biological
 reproducibility of the actual result we care about).
 
 ```{r replicate-freq-correlation}
-rep_wide <- counts_norm %>%
-  select(sample_id, binder_id, freq, condition, replicate) %>%
-  pivot_wider(id_cols = c(binder_id, condition), names_from = replicate, values_from = freq)
+if (has_replicates) {
+  rep_wide <- counts_norm %>%
+    select(sample_id, binder_id, freq, condition, replicate) %>%
+    pivot_wider(id_cols = c(binder_id, condition), names_from = replicate, values_from = freq)
 
-rep_wide %>%
-  ggplot(aes(x = A, y = B)) +
-  geom_point(alpha = 0.6) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey40") +
-  scale_x_log10(labels = label_number()) +
-  scale_y_log10(labels = label_number()) +
-  facet_wrap(~condition) +
-  labs(title = "Replicate A vs B: normalised binder frequency", x = "Rep A freq", y = "Rep B freq") +
-  theme_minimal()
+  print(
+    rep_wide %>%
+      ggplot(aes(x = A, y = B)) +
+      geom_point(alpha = 0.6) +
+      geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey40") +
+      scale_x_log10(labels = label_number()) +
+      scale_y_log10(labels = label_number()) +
+      facet_wrap(~condition) +
+      labs(title = "Replicate A vs B: normalised binder frequency", x = "Rep A freq", y = "Rep B freq") +
+      theme_minimal()
+  )
 
-rep_wide %>%
-  group_by(condition) %>%
-  summarise(pearson_r = cor(log10(A), log10(B), use = "complete.obs"), .groups = "drop")
+  rep_wide %>%
+    group_by(condition) %>%
+    summarise(pearson_r = cor(log10(A), log10(B), use = "complete.obs"), .groups = "drop")
+} else {
+  message("Skipping - only one replicate present.")
+}
 ```
 
 Now the same check on the log2FC that actually feeds the hit-calling below -
@@ -237,51 +256,73 @@ lfc_per_rep <- per_rep_freq %>%
   left_join(toxin_only_per_rep, by = c("binder_id", "replicate")) %>%
   mutate(log2FC = log2(freq / toxin_only_freq))
 
-lfc_per_rep_wide <- lfc_per_rep %>%
-  pivot_wider(id_cols = c(binder_id, condition), names_from = replicate, values_from = log2FC)
+if (has_replicates) {
+  lfc_per_rep_wide <- lfc_per_rep %>%
+    pivot_wider(id_cols = c(binder_id, condition), names_from = replicate, values_from = log2FC)
 
-lfc_per_rep_wide %>%
-  ggplot(aes(x = A, y = B)) +
-  geom_point(alpha = 0.6) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey40") +
-  facet_wrap(~condition) +
-  labs(title = "Replicate A vs B: log2FC (toxin+library vs toxin-only)",
-       x = "Rep A log2FC", y = "Rep B log2FC") +
-  theme_minimal()
+  print(
+    lfc_per_rep_wide %>%
+      ggplot(aes(x = A, y = B)) +
+      geom_point(alpha = 0.6) +
+      geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey40") +
+      facet_wrap(~condition) +
+      labs(title = "Replicate A vs B: log2FC (toxin+library vs toxin-only)",
+           x = "Rep A log2FC", y = "Rep B log2FC") +
+      theme_minimal()
+  )
 
-lfc_per_rep_wide %>%
-  group_by(condition) %>%
-  summarise(pearson_r = cor(A, B, use = "complete.obs"), .groups = "drop")
+  lfc_per_rep_wide %>%
+    group_by(condition) %>%
+    summarise(pearson_r = cor(A, B, use = "complete.obs"), .groups = "drop")
+} else {
+  message("Skipping - only one replicate present.")
+}
 ```
 
 **A binder is only worth trusting as a hit if its two replicates agree** -
 flag anything where A and B disagree in sign or differ by a lot, and treat
-those as inconclusive rather than as hits or non-hits.
+those as inconclusive rather than as hits or non-hits. (Skipped entirely if
+only one replicate exists - there's nothing to check agreement against yet.)
 
 ```{r flag-inconsistent}
 consistency_threshold <- 1  # max allowed |A - B| in log2FC units; tune by eye from the plot above
 
-lfc_flagged <- lfc_per_rep_wide %>%
-  mutate(
-    same_direction = sign(A) == sign(B),
-    abs_diff       = abs(A - B),
-    consistent     = same_direction & abs_diff <= consistency_threshold
-  )
+if (has_replicates) {
+  lfc_flagged <- lfc_per_rep_wide %>%
+    mutate(
+      same_direction = sign(A) == sign(B),
+      abs_diff       = abs(A - B),
+      consistent     = same_direction & abs_diff <= consistency_threshold
+    )
 
-lfc_flagged %>% count(condition, consistent)
+  lfc_flagged %>% count(condition, consistent)
+} else {
+  message("Skipping - only one replicate present.")
+}
 ```
 
 ## 6. Final ranked hit table
 
-Average the two replicates' log2FC (toxin+library vs toxin-only) for
-consistent binders only, and rank.
+With both replicates, average their log2FC (toxin+library vs toxin-only)
+for consistent binders only, and rank. With a single replicate, rank
+directly on that replicate's log2FC instead - but mark the table
+**provisional**: nothing here has been checked for reproducibility yet, so
+treat it as "worth a closer look", not "confirmed hits", until replicate B
+exists.
 
 ```{r final-hits}
-final_hits <- lfc_flagged %>%
-  filter(consistent) %>%
-  mutate(mean_log2FC = (A + B) / 2) %>%
-  select(binder_id, condition, mean_log2FC, A, B) %>%
-  arrange(condition, desc(mean_log2FC))
+if (has_replicates) {
+  final_hits <- lfc_flagged %>%
+    filter(consistent) %>%
+    mutate(mean_log2FC = (A + B) / 2, provisional = FALSE) %>%
+    select(binder_id, condition, mean_log2FC, A, B, provisional) %>%
+    arrange(condition, desc(mean_log2FC))
+} else {
+  final_hits <- lfc_per_rep %>%
+    mutate(mean_log2FC = log2FC, A = log2FC, B = NA_real_, provisional = TRUE) %>%
+    select(binder_id, condition, mean_log2FC, A, B, provisional) %>%
+    arrange(condition, desc(mean_log2FC))
+}
 
 final_hits
 ```
@@ -290,12 +331,13 @@ final_hits
 final_hits %>%
   filter(condition == "toxin_plus_library_1mM") %>%
   slice_max(mean_log2FC, n = 20) %>%
-  ggplot(aes(x = reorder(binder_id, mean_log2FC), y = mean_log2FC)) +
-  geom_col(fill = "steelblue") +
-  geom_errorbar(aes(ymin = pmin(A, B), ymax = pmax(A, B)), width = 0.2) +
+  ggplot(aes(x = reorder(binder_id, mean_log2FC), y = mean_log2FC, fill = provisional)) +
+  geom_col() +
+  { if (has_replicates) geom_errorbar(aes(ymin = pmin(A, B), ymax = pmax(A, B)), width = 0.2) } +
   coord_flip() +
+  scale_fill_manual(values = c(`FALSE` = "steelblue", `TRUE` = "grey60"), guide = if (has_replicates) "none" else "legend") +
   labs(x = "Binder", y = "log2FC vs toxin-only (1 mM IPTG)",
-       title = "Top 20 RcaT binders by replicate-consistent enrichment") +
+       title = paste("Top 20 RcaT binders by", if (has_replicates) "replicate-consistent enrichment" else "enrichment (provisional - single replicate)")) +
   theme_minimal()
 ```
 

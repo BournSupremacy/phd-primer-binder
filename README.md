@@ -148,23 +148,6 @@ these:
   (`Python`/`Pysam` are for `count_reads_per_binder.py`, called at the end
   of that script - BWA/SAMtools alone don't cover it)
 
-If your cluster doesn't have modules for one of these, `environment.yml`
-is a conda/mamba fallback covering everything except `bcl-convert` itself
-(not distributed on conda - install it separately from Illumina):
-
-```bash
-conda env create -f environment.yml   # or: mamba env create -f environment.yml
-conda activate rcaT-binder-screen
-```
-
-`environment.yml` only uses the `bioconda`/`conda-forge` channels - not
-`defaults`, which is the channel many institutions (EMBL included)
-restrict over Anaconda's commercial licensing terms - so this should work
-even where "conda" in general is flagged as an issue. If it still doesn't,
-see the note at the top of `environment.yml` (a stray `defaults` entry in
-`~/.condarc`, or use `mamba`/`micromamba` instead, which don't ship a
-preconfigured `defaults` channel at all).
-
 - **Analysis** (`analysis/DMS_analysis.Rmd`): R with `tidyverse` and
   `scales`:
   ```r

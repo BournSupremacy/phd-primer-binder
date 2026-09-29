@@ -206,6 +206,67 @@ key_comparison %>%
   theme_minimal()
 ```
 
+**Careful: this comparison is confounded.** `toxin_only` has zero IPTG, so no binder
+is meaningfully overexpressed there - but `toxin_plus_library` has both toxin *and*
+induced overexpression. IPTG-driven overexpression carries its own, RcaT-independent
+fitness cost (translation burden, misfolding, etc.), and it varies by binder. So a
+binder that's simply cheap to overexpress can look "protective" here even if it does
+nothing to RcaT. Section 4c below controls for this.
+
+### 4c. Controlling for overexpression burden: the interaction term
+
+We have a full 2x2 design (toxin x IPTG), so we can isolate the toxin-specific
+effect properly instead of guessing at a "better" single baseline. The idea:
+measure how much toxin's effect changes when the binder is induced, using each
+binder's *own* induced/uninduced pair as its own baseline on both sides:
+
+```
+true_protection = log2FC(toxin+lib vs library-only)  -  log2FC(toxin-only vs no-inducer)
+                    [toxin's effect WITH the binder induced]   [toxin's effect WITHOUT any binder induced]
+```
+
+The first term already nets out each binder's own overexpression burden (both its
+numerator and denominator are induced at the same IPTG level). The second term is
+the toxin's blanket killing effect at baseline leaky expression - roughly constant
+across binders, but computed per-binder here anyway since leakiness itself can
+differ. Subtracting them leaves only the part that depends on *both* toxin and
+induced binder being present together - i.e. actual RcaT-specific rescue.
+
+```{r lfc-interaction}
+library_only_mean <- condition_means %>%
+  filter(condition %in% c("library_only_0.1mM", "library_only_1mM")) %>%
+  mutate(iptg_level = str_remove(condition, "library_only_")) %>%
+  select(binder_id, iptg_level, library_only_freq = mean_freq)
+
+toxin_plus_library_mean <- condition_means %>%
+  filter(condition %in% c("toxin_plus_library_0.1mM", "toxin_plus_library_1mM")) %>%
+  mutate(iptg_level = str_remove(condition, "toxin_plus_library_")) %>%
+  select(binder_id, iptg_level, condition, toxin_plus_library_freq = mean_freq)
+
+interaction_comparison <- toxin_plus_library_mean %>%
+  left_join(library_only_mean, by = c("binder_id", "iptg_level")) %>%
+  left_join(toxin_only_mean, by = "binder_id") %>%
+  left_join(baseline, by = "binder_id") %>%
+  mutate(
+    true_protection = log2(toxin_plus_library_freq / library_only_freq) -
+      log2(toxin_only_freq / baseline_freq)
+  )
+
+interaction_comparison %>%
+  ggplot(aes(x = reorder(binder_id, true_protection), y = true_protection, fill = condition)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  labs(x = "Binder", y = "log2FC(toxin+lib vs lib-only) - log2FC(toxin-only vs no-inducer)",
+       title = "Toxin-specific protection, controlling for overexpression burden",
+       subtitle = "Positive = this binder neutralises the toxin, beyond what its own overexpression burden explains") +
+  theme_minimal()
+```
+
+This burden-controlled `true_protection` value is what actually answers the
+biological question, so it's what Sections 5-6 check for replicate consistency
+and rank below - not the simpler, confounded 4b comparison (which is still
+useful as a teaching example of exactly this kind of confound).
+
 ## 5. Replicate consistency
 
 Before trusting the log2FC table above, check that replicate A and
@@ -239,22 +300,34 @@ if (has_replicates) {
 }
 ```
 
-Now the same check on the log2FC that actually feeds the hit-calling below -
-compute log2FC(toxin+library vs toxin-only) **per replicate** (not averaged)
-and compare A vs B directly.
+Now the same check on the burden-controlled `true_protection` value from 4c
+that actually feeds the hit-calling below - compute it **per replicate** (not
+averaged) and compare A vs B directly.
 
 ```{r replicate-lfc-consistency}
 per_rep_freq <- counts_norm %>%
   select(sample_id, binder_id, condition, replicate, freq)
 
+no_inducer_per_rep <- per_rep_freq %>%
+  filter(condition == "no_inducer") %>%
+  select(binder_id, replicate, no_inducer_freq = freq)
+
 toxin_only_per_rep <- per_rep_freq %>%
   filter(condition == "toxin_only") %>%
   select(binder_id, replicate, toxin_only_freq = freq)
 
+library_only_per_rep <- per_rep_freq %>%
+  filter(condition %in% c("library_only_0.1mM", "library_only_1mM")) %>%
+  mutate(iptg_level = str_remove(condition, "library_only_")) %>%
+  select(binder_id, replicate, iptg_level, library_only_freq = freq)
+
 lfc_per_rep <- per_rep_freq %>%
   filter(condition %in% c("toxin_plus_library_0.1mM", "toxin_plus_library_1mM")) %>%
+  mutate(iptg_level = str_remove(condition, "toxin_plus_library_")) %>%
+  left_join(library_only_per_rep, by = c("binder_id", "replicate", "iptg_level")) %>%
   left_join(toxin_only_per_rep, by = c("binder_id", "replicate")) %>%
-  mutate(log2FC = log2(freq / toxin_only_freq))
+  left_join(no_inducer_per_rep, by = c("binder_id", "replicate")) %>%
+  mutate(log2FC = log2(freq / library_only_freq) - log2(toxin_only_freq / no_inducer_freq))
 
 if (has_replicates) {
   lfc_per_rep_wide <- lfc_per_rep %>%
@@ -266,8 +339,8 @@ if (has_replicates) {
       geom_point(alpha = 0.6) +
       geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey40") +
       facet_wrap(~condition) +
-      labs(title = "Replicate A vs B: log2FC (toxin+library vs toxin-only)",
-           x = "Rep A log2FC", y = "Rep B log2FC") +
+      labs(title = "Replicate A vs B: burden-controlled true_protection (from 4c)",
+           x = "Rep A true_protection", y = "Rep B true_protection") +
       theme_minimal()
   )
 
@@ -303,9 +376,9 @@ if (has_replicates) {
 
 ## 6. Final ranked hit table
 
-With both replicates, average their log2FC (toxin+library vs toxin-only)
-for consistent binders only, and rank. With a single replicate, rank
-directly on that replicate's log2FC instead - but mark the table
+With both replicates, average their burden-controlled `true_protection`
+(from 4c) for consistent binders only, and rank. With a single replicate,
+rank directly on that replicate's value instead - but mark the table
 **provisional**: nothing here has been checked for reproducibility yet, so
 treat it as "worth a closer look", not "confirmed hits", until replicate B
 exists.
@@ -336,8 +409,8 @@ final_hits %>%
   { if (has_replicates) geom_errorbar(aes(ymin = pmin(A, B), ymax = pmax(A, B)), width = 0.2) } +
   coord_flip() +
   scale_fill_manual(values = c(`FALSE` = "steelblue", `TRUE` = "grey60"), guide = if (has_replicates) "none" else "legend") +
-  labs(x = "Binder", y = "log2FC vs toxin-only (1 mM IPTG)",
-       title = paste("Top 20 RcaT binders by", if (has_replicates) "replicate-consistent enrichment" else "enrichment (provisional - single replicate)")) +
+  labs(x = "Binder", y = "true_protection (1 mM IPTG, burden-controlled)",
+       title = paste("Top 20 RcaT binders by", if (has_replicates) "replicate-consistent, burden-controlled protection" else "burden-controlled protection (provisional - single replicate)")) +
   theme_minimal()
 ```
 

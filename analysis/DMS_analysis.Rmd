@@ -51,6 +51,8 @@ Steps below:
 5. The actual question: toxin+library vs. toxin-only.
 6. Check that replicates A and B agree.
 7. Final ranked hit table.
+8. Compare against the collaborator's published plate-based screen of the
+   same binders (Sen2 retron), as an independent sanity check.
 
 ```{r libraries}
 library(tidyverse)   # readr, dplyr, tidyr, ggplot2, purrr
@@ -419,6 +421,70 @@ final_hits %>%
 ```{r save-final-table}
 write_csv(final_hits, "../results/final_binder_ranking.csv")
 ```
+
+## 8. Comparison to the published plate-based screen (Sen2 retron)
+
+Our collaborator ran an equivalent screen of these same binders with a
+plate-based assay and shared the results (`data/plate_assay_reference_hits.tsv`),
+filtered here to `retron == "Sen2"` (RcaT is the toxin from the Sen2
+toxin-antitoxin system used in this project; the file's other retron, Eco9,
+is a different system and isn't relevant here). Effect size > 1 means
+blocking/protective, matching the sign of a positive `log2FC` in our own
+result.
+
+**This isn't an apples-to-apples comparison**: their effect sizes are
+calculated against an IPTG-low baseline, not our toxin-only baseline, so
+treat this as a rough sanity check on direction and relative ranking, not a
+strict validation of magnitude.
+
+```{r load-plate-reference}
+plate_reference <- read_tsv("../data/plate_assay_reference_hits.tsv", show_col_types = FALSE) %>%
+  filter(retron == "Sen2") %>%
+  transmute(genename, plate_pval = pval, plate_log2_efsize = log2(efsize), plate_hit = hit)
+
+# Our binder_id values carry a naming-scheme prefix (`result_...` or
+# `rcat-binder-..._result_<n>`) that the collaborator's gene names don't -
+# strip it down to the same bare name before joining.
+binder_name_map <- tibble(binder_id = unique(key_comparison$binder_id)) %>%
+  mutate(
+    genename = binder_id %>%
+      str_remove("^rcat-binder-") %>%
+      str_remove("^result_") %>%
+      str_replace("_result_", "_")
+  )
+
+comparison <- key_comparison %>%
+  left_join(binder_name_map, by = "binder_id") %>%
+  left_join(plate_reference, by = "genename") %>%
+  filter(!is.na(plate_log2_efsize))
+
+comparison %>%
+  ggplot(aes(x = plate_log2_efsize, y = log2FC, colour = plate_hit)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, colour = "grey40", linetype = "dashed") +
+  facet_wrap(~condition) +
+  labs(x = "Published plate assay: log2(effect size), Sen2 (vs. IPTG-low)",
+       y = "This screen: log2FC (toxin+library vs. toxin-only)",
+       title = "This screen vs. the published plate-based assay",
+       colour = "Plate-assay hit call") +
+  theme_minimal()
+
+comparison %>%
+  group_by(condition) %>%
+  summarise(pearson_r = cor(log2FC, plate_log2_efsize, use = "complete.obs"),
+            n_binders_matched = n(), .groups = "drop")
+```
+
+```{r save-comparison-table}
+write_csv(comparison, "../results/plate_assay_comparison.csv")
+```
+
+A positive correlation here is reassuring, but don't over-read a weak one:
+this screen's baseline (toxin-only) and the plate assay's (IPTG-low) aren't
+the same condition, both assays have their own noise, and a binder missing
+from `plate_reference` above just wasn't in that dataset (check
+`n_binders_matched` against the number of viable binders from Section 2 to
+see how many actually got compared).
 
 ## Where to go from here
 

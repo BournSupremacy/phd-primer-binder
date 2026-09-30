@@ -1,0 +1,177 @@
+genename	retron	copynum	pval	efsize	hit	toxicity	leakiness	selfrescuingblocker
+100aa_1_10	Eco9	pir116	0.673281745386922	1.00853340751856	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+100aa_1_10	Sen2	pir116	0.000139741366507183	0.78836309075554	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+100aa_1_13	Eco9	pir116	0.0652376651114287	1.15842469850729	neutral	non-toxic	non-leaky	true blocker
+100aa_1_13	Sen2	pir116	0.0136997987657088	1.21863427162484	neutral	non-toxic	leaky	true blocker
+100aa_1_2	Eco9	pir116	0.00255944870227195	1.19706077568255	hit	non-toxic	non-leaky	true blocker
+100aa_1_2	Sen2	pir116	0.114887867729922	1.02383676759526	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+100aa_1_4	Eco9	pir116	0.264641831838635	1.21786090395141	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+100aa_1_4	Sen2	pir116	0.188421447645169	1.00143114085873	neutral	non-toxic	non-leaky	true blocker
+100aa_1_8	Eco9	pir116	0.314703929022211	1.11266864432474	neutral	non-toxic	non-leaky	true blocker
+100aa_1_8	Sen2	pir116	0.219890308579035	0.937609905972503	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+100aa_1_9	Eco9	pir116	0.193731497977841	1.10355054161475	neutral	toxic	non-leaky	true blocker
+100aa_1_9	Sen2	pir116	0.000241077698554884	1.14207445969187	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+100aa_2_1	Eco9	pir116	0.0243680976695899	1.12909830805129	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+100aa_2_1	Sen2	pir116	0.0174021517519069	1.01734063326959	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+100aa_2_10	Eco9	pir116	0.266979968047328	1.2675106627259	neutral	non-toxic	non-leaky	true blocker
+100aa_2_10	Sen2	pir116	0.290329474302503	0.932103167711211	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low
+100aa_2_2	Eco9	pir116	0.00086672532532022	1.2484798027239	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+100aa_2_2	Sen2	pir116	0.00550526897588607	1.09673569307943	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+100aa_2_9	Eco9	pir116	0.000454860524325851	1.31665440653544	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+100aa_2_9	Sen2	pir116	1.05987744824038e-07	1.23733749767656	hit	toxic	leaky	self-rescuing blocker or synergy high
+100aa_3_1	Eco9	pir116	0.00201607581190949	1.28922500490865	hit	toxic	non-leaky	true blocker
+100aa_3_1	Sen2	pir116	0.00025840996528932	1.38800801232845	hit	toxic	leaky	self-rescuing blocker or synergy high
+50aa_1_1	Eco9	pir116	0.191171241001396	1.35836219242459	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_1_1	Sen2	pir116	0.000523848618270531	1.07163862543716	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_1_10	Eco9	pir116	0.649850952104052	0.913060486255523	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_10	Sen2	pir116	0.707861608015302	0.950670850072227	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_12	Eco9	pir116	0.554817732419986	1.08276398208286	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_12	Sen2	pir116	0.000204047097704517	0.631386826177687	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_14	Eco9	pir116	0.204594578371797	1.3210469309509	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_1_14	Sen2	pir116	0.000159715294747553	1.13905532431637	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_1_16	Eco9	pir116	0.0582915411191897	1.37219628379224	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_1_16	Sen2	pir116	0.669016270406587	0.9552379462982	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_23	Eco9	pir116	0.00722894171740981	1.14754964645746	hit	non-toxic	non-leaky	true blocker
+50aa_1_23	Sen2	pir116	0.00123399486897536	1.27133648161755	hit	non-toxic	non-leaky	true blocker
+50aa_1_24	Eco9	pir116	0.351105670881299	1.00974324021175	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_1_24	Sen2	pir116	0.826557261247691	0.954551615148278	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_31	Eco9	pir116	0.155180839732412	1.23219055528536	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_1_31	Sen2	pir116	3.14590242568406e-05	0.755470210548185	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_32	Eco9	pir116	0.0143468860147478	1.18606720004001	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_1_32	Sen2	pir116	0.272013928379477	0.996578228718537	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_36	Eco9	pir116	0.314722107279501	0.85714538792078	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_36	Sen2	pir116	0.344549848902275	0.98752710508598	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low
+50aa_1_37	Eco9	pir116	0.00126933744712976	1.22143838603518	hit	toxic	non-leaky	true blocker
+50aa_1_37	Sen2	pir116	1.14504062574152e-05	1.25297278344239	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_1_40	Eco9	pir116	0.931647535744865	0.939126194015334	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_40	Sen2	pir116	0.116224278478861	0.995300902861005	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low
+50aa_1_41	Eco9	pir116	0.266468632143216	1.22835527368399	neutral	non-toxic	non-leaky	true blocker
+50aa_1_41	Sen2	pir116	0.0223561068875958	0.906624464501609	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_44	Eco9	pir116	0.172577349932063	1.16408004941481	neutral	non-toxic	non-leaky	true blocker
+50aa_1_44	Sen2	pir116	0.00592427934652833	1.03522180482186	hit	non-toxic	non-leaky	true blocker
+50aa_1_46	Sen2	pir116	7.35766947484488e-06	0.808536547698785	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_48	Eco9	pir116	0.0977730887925022	1.52548229869346	neutral	non-toxic	non-leaky	true blocker
+50aa_1_48	Sen2	pir116	7.94467029976718e-10	1.56784648509875	hit	non-toxic	leaky	true blocker
+50aa_1_5	Eco9	pir116	0.863960696248729	0.994479133541765	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_1_5	Sen2	pir116	0.000307179037658781	0.72984122698625	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_52	Eco9	pir116	0.224314187193657	1.11314432133204	neutral	non-toxic	non-leaky	true blocker
+50aa_1_52	Sen2	pir116	0.82322498591005	0.972279489612528	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_1_55	Eco9	pir116	0.000955707222616709	1.23067717154785	hit	non-toxic	non-leaky	true blocker
+50aa_1_55	Sen2	pir116	2.44067349925871e-08	1.39900315026871	hit	non-toxic	leaky	true blocker
+50aa_2_0	Eco9	pir116	3.61454409359772e-05	1.39572156582036	hit	toxic	non-leaky	true blocker
+50aa_2_0	Sen2	pir116	0.0062430455263739	1.12025916778774	hit	toxic	non-leaky	true blocker
+50aa_2_1	Eco9	pir116	0.0544401179005091	1.09658498464507	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_1	Sen2	pir116	5.47944548142639e-06	1.20768252540956	hit	non-toxic	non-leaky	true blocker
+50aa_2_10	Eco9	pir116	0.214342516936241	1.17689573840984	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_10	Sen2	pir116	0.00101584377031257	1.3265655609906	hit	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_11	Eco9	pir116	0.200689046532106	1.10195767419583	neutral	non-toxic	non-leaky	true blocker
+50aa_2_11	Sen2	pir116	0.31594239101084	0.995459766459873	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low
+50aa_2_14	Eco9	pir116	0.00288778944202079	1.1991623953971	hit	non-toxic	non-leaky	true blocker
+50aa_2_14	Sen2	pir116	9.93779962482278e-08	1.51350901462841	hit	non-toxic	non-leaky	true blocker
+50aa_2_15	Eco9	pir116	0.00418871110407998	1.17543083423835	hit	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_15	Sen2	pir116	0.0181133680858318	1.1878824880016	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_22	Eco9	pir116	0.47581712197447	1.21283243096595	neutral	non-toxic	non-leaky	true blocker
+50aa_2_22	Sen2	pir116	0.000603389915732283	0.813571094416764	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_24	Eco9	pir116	0.814145819634634	0.973628647505885	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_24	Sen2	pir116	0.000311312887867424	0.80707547987597	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_26	Eco9	pir116	0.808643331359988	0.922524963720226	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low
+50aa_2_26	Sen2	pir116	0.000713447037206173	1.28250966139579	hit	non-toxic	non-leaky	true blocker
+50aa_2_27	Eco9	pir116	0.0977970082904854	0.74255884221206	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_27	Sen2	pir116	0.0208430962892193	0.913588824800167	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_31	Eco9	pir116	0.0244659150249281	1.75743049370385	neutral	non-toxic	non-leaky	true blocker
+50aa_2_31	Sen2	pir116	0.0367552028105788	1.02170674077032	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_33	Eco9	pir116	0.367768734810041	1.19951231635339	neutral	non-toxic	non-leaky	true blocker
+50aa_2_33	Sen2	pir116	0.26268474139402	1.00033064593422	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_35	Eco9	pir116	0.0538543976096776	1.07935391889433	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_35	Sen2	pir116	0.288387400538165	1.01070520785532	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_40	Eco9	pir116	0.0552410954740319	1.12455536148843	neutral	non-toxic	non-leaky	true blocker
+50aa_2_40	Sen2	pir116	0.929069831670352	0.968933532818931	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low
+50aa_2_41	Eco9	pir116	0.845803206988821	0.977380297371841	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_41	Sen2	pir116	0.000435847946861711	1.07395618841693	hit	toxic	non-leaky	true blocker
+50aa_2_42	Eco9	pir116	0.0346603279191672	0.603639224694254	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_42	Sen2	pir116	4.53570855083971e-06	0.591593707789352	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_45	Eco9	pir116	0.642396971973235	1.01330632951812	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low
+50aa_2_45	Sen2	pir116	0.0362590051417695	1.03088044695429	neutral	non-toxic	non-leaky	true blocker
+50aa_2_48	Eco9	pir116	0.301743471493008	0.819823952778172	neutral	toxic	non-leaky	self-rescuing blocker or synergy low
+50aa_2_48	Sen2	pir116	0.00295676007220961	0.886985736969574	neutral	toxic	non-leaky	self-rescuing blocker or synergy low
+50aa_2_5	Sen2	pir116	0.00421080750677921	0.461922749086835	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_51	Eco9	pir116	0.00340646696970695	1.21047257387597	hit	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_51	Sen2	pir116	0.0328461505563143	1.04074085420656	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_52	Eco9	pir116	0.00410517816510273	1.79831416644527	hit	toxic	non-leaky	true blocker
+50aa_2_52	Sen2	pir116	0.000414182416378946	1.34407689486849	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_2_62	Eco9	pir116	0.00313497631162	1.17982338728467	hit	non-toxic	non-leaky	true blocker
+50aa_2_62	Sen2	pir116	0.0150876898708731	1.08892830774164	neutral	non-toxic	non-leaky	true blocker
+50aa_2_63	Eco9	pir116	0.312758307845783	1.33001028436269	neutral	non-toxic	non-leaky	true blocker
+50aa_2_63	Sen2	pir116	0.00767124692874201	1.06105116361282	hit	non-toxic	non-leaky	true blocker
+50aa_2_64	Eco9	pir116	0.686412292649303	0.996397767419577	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_64	Sen2	pir116	0.0118433045416243	0.89749270499405	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_2_65	Eco9	pir116	0.905848797528362	0.943203896443352	neutral	non-toxic	leaky	self-rescuing blocker or synergy low and high
+50aa_2_65	Sen2	pir116	0.0307782642336971	0.905166239486221	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_10	Eco9	pir116	0.59880419400488	1.02723850130305	neutral	non-toxic	non-leaky	true blocker
+50aa_3_10	Sen2	pir116	0.0123272781125598	0.884766270769207	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low
+50aa_3_16	Eco9	pir116	0.086298917367568	1.21450823141176	neutral	non-toxic	non-leaky	true blocker
+50aa_3_16	Sen2	pir116	0.00444389000991819	1.05225224003061	hit	non-toxic	non-leaky	true blocker
+50aa_3_24	Eco9	pir116	0.000228679698009866	1.34728674189508	hit	toxic	non-leaky	true blocker
+50aa_3_24	Sen2	pir116	3.02871361630241e-05	1.30892558115095	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_3_26	Eco9	pir116	0.596083139795369	1.11551968764184	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_3_26	Sen2	pir116	0.0106860606957525	0.903600388480214	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_28	Eco9	pir116	0.730613235518883	1.09203465179815	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_28	Sen2	pir116	0.00127278185795116	0.834358087172403	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_3	Eco9	pir116	0.131234886632571	1.05683523818279	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_3_3	Sen2	pir116	0.401661017601298	0.990171946799703	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_32	Eco9	pir116	0.250449042198442	1.3353945514351	neutral	toxic	non-leaky	true blocker
+50aa_3_32	Sen2	pir116	0.0798336901248318	0.900987687624271	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_35	Eco9	pir116	0.802706406274188	1.0081096216877	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_35	Sen2	pir116	6.59060282815617e-05	0.852116861731454	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_37	Eco9	pir116	0.00562260079796546	1.18391513349219	hit	non-toxic	non-leaky	true blocker
+50aa_3_37	Sen2	pir116	0.00228032431205022	1.10251824145165	hit	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_3_46	Eco9	pir116	0.701066099080577	0.866192052986103	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_46	Sen2	pir116	2.44890861184161e-05	0.502622525370582	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_51	Eco9	pir116	0.0270169284150347	1.31418045719392	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_3_51	Sen2	pir116	0.0157400342544231	1.10518970320773	neutral	non-toxic	non-leaky	true blocker
+50aa_3_52	Eco9	pir116	0.0247185422547175	1.28223541204784	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_3_52	Sen2	pir116	0.746519540933475	0.973606726565139	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_58	Eco9	pir116	0.346176189792109	1.24350273990612	neutral	toxic	non-leaky	true blocker
+50aa_3_58	Sen2	pir116	0.00755483413636912	0.892073991832615	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_61	Eco9	pir116	0.214009614050872	1.05521977464122	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+50aa_3_61	Sen2	pir116	0.117401754309131	0.896735315037308	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_63	Eco9	pir116	0.237559002422368	1.17378636781414	neutral	non-toxic	non-leaky	true blocker
+50aa_3_63	Sen2	pir116	0.000221311928596005	0.865561828441451	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_7	Eco9	pir116	0.00916292847125538	1.16907611479386	hit	non-toxic	non-leaky	true blocker
+50aa_3_7	Sen2	pir116	0.000300307406452436	1.06501122502556	hit	non-toxic	non-leaky	true blocker
+50aa_3_9	Eco9	pir116	0.772982565347546	1.04565992603694	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+50aa_3_9	Sen2	pir116	5.50792091076508e-06	0.811707685844675	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-100-nr2-run_4_2	Eco9	pir116	0.468052859848215	1.01517682184039	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+cpx-100-nr2-run_4_2	Sen2	pir116	0.272721794581288	0.939597086486379	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-100-nr2-run_5_2	Eco9	pir116	0.00423364511144115	1.2820263894444	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+cpx-100-nr2-run_5_2	Sen2	pir116	0.0659694092814065	1.04074145586159	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+cpx-50-nr2-run_1_2	Eco9	pir116	0.917312214356917	0.97537590895067	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-50-nr2-run_1_2	Sen2	pir116	0.000300684223700916	0.809558189100382	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-50-nr2-run_1_5	Eco9	pir116	0.28198749670977	1.17357610151282	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy high
+cpx-50-nr2-run_1_5	Sen2	pir116	0.956317446238461	0.968297914251876	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low
+cpx-50-nr2-run_1_6	Eco9	pir116	0.0443750867918086	1.10643125420059	neutral	non-toxic	non-leaky	true blocker
+cpx-50-nr2-run_1_6	Sen2	pir116	0.130711774975905	1.02845931693239	neutral	non-toxic	non-leaky	true blocker
+cpx-50-nr2-run_3_11	Eco9	pir116	0.417380482470744	1.00916530333259	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+cpx-50-nr2-run_3_11	Sen2	pir116	0.145159973475421	1.00592811912059	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+cpx-50-nr2-run_3_12	Eco9	pir116	0.227708489450237	0.793768567339682	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-50-nr2-run_3_12	Sen2	pir116	0.987556567667945	0.967076854240832	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low
+cpx-50-nr2-run_3_4	Eco9	pir116	0.874172300362479	0.995803635054076	neutral	toxic	non-leaky	self-rescuing blocker or synergy low
+cpx-50-nr2-run_3_4	Sen2	pir116	0.0112626212592235	1.09636568924865	neutral	toxic	non-leaky	true blocker
+cpx-50-nr2-run_3_6	Eco9	pir116	0.86080443385519	0.977082260563865	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-50-nr2-run_3_6	Sen2	pir116	0.103701748413817	1.00045072445536	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-50-nr2-run_3_8	Eco9	pir116	0.458425157777227	1.01922429094243	neutral	non-toxic	non-leaky	true blocker
+cpx-50-nr2-run_3_8	Sen2	pir116	0.0122385687575462	1.02545503440261	neutral	non-toxic	non-leaky	true blocker
+cpx-50-nr2-run_4_5	Eco9	pir116	0.00648176334080692	1.22649923043997	hit	toxic	non-leaky	self-rescuing blocker or synergy high
+cpx-50-nr2-run_4_5	Sen2	pir116	1.48849646158794e-05	0.810085526020938	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-50-nr2-run_4_6	Eco9	pir116	0.119092780333957	1.11477449264706	neutral	toxic	non-leaky	self-rescuing blocker or synergy high
+cpx-50-nr2-run_4_6	Sen2	pir116	0.0549331529297091	0.886664327746892	neutral	toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-50-nr2-run_5_0	Eco9	pir116	6.35899222432288e-07	2.99614505742703	hit	non-toxic	non-leaky	true blocker
+cpx-50-nr2-run_5_0	Sen2	pir116	8.75698026028627e-10	1.37324019826991	hit	non-toxic	leaky	true blocker
+cpx-50-nr2-run_5_13	Eco9	pir116	0.0106107790032608	1.13309066346623	neutral	toxic	non-leaky	true blocker
+cpx-50-nr2-run_5_13	Sen2	pir116	0.000267150467077436	1.06861723513053	hit	toxic	non-leaky	true blocker
+cpx-50-nr2-run_5_2	Eco9	pir116	0.299248546528917	0.818032786905644	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-50-nr2-run_5_2	Sen2	pir116	0.163727442202838	0.933941639173997	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+cpx-50-nr2-run_5_8	Eco9	pir116	0.0727576221453642	1.09452273640323	neutral	non-toxic	non-leaky	true blocker
+cpx-50-nr2-run_5_8	Sen2	pir116	0.0580883591195701	1.01837162669041	neutral	non-toxic	non-leaky	true blocker
+gfp	Eco9	pir116	1	1.01425537534321	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high
+gfp	Sen2	pir116	1	1.00025008930408	neutral	non-toxic	non-leaky	self-rescuing blocker or synergy low and high

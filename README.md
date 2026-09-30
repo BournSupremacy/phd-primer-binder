@@ -35,6 +35,7 @@ config/
   IlluminaSampleSheet_template.csv template BCL Convert sample sheet for demux (fill in real indices)
 data/
   binders.fasta                   the 88 designed RcaT binder sequences - the alignment reference used throughout
+  plate_assay_reference_hits.tsv  collaborator's published plate-based screen results, for the comparison in DMS_analysis.Rmd
   demux/                          demultiplexed fastq.gz land here, flat, as <sample_id>_R{1,2}.fastq.gz
 scripts/
   00_bcl_to_fastq.sh               demultiplex raw sequencer output -> data/demux/ (also an sbatch script - see below)
@@ -184,3 +185,8 @@ same core comparison (toxin+library vs. toxin-only), with `no_inducer` and
    disagree before trusting it as a hit.
 7. Final ranked hit table + plot of the top consistently-enriched binders,
    written to `results/final_binder_ranking.csv`.
+8. Comparison to the collaborator's published plate-based screen of the same
+   binders (`data/plate_assay_reference_hits.tsv`, filtered to the Sen2
+   retron) - a rough sanity check on direction/ranking, not a strict
+   validation (their effect size uses a different baseline), written to
+   `results/plate_assay_comparison.csv`.

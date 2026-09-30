@@ -156,20 +156,31 @@ these:
 
 ## The analysis logic (see `analysis/DMS_analysis.Rmd` for the full walkthrough)
 
+This mirrors the lab's existing plate-based version of the same assay: the
+same core comparison (toxin+library vs. toxin-only), with `no_inducer` and
+`library_only` used as QC/context steps rather than as normalisation inputs.
+
 1. Load `results/binder_counts.tsv` (long format: sample, binder, count) +
    `config/samples.tsv` metadata; reshape into a binder x sample table.
-2. QC: read depth and number of binders detected per sample.
+2. QC: read depth and number of binders detected per sample, then a
+   **viability filter** - drop any binder whose mean read count under
+   `no_inducer` (antibiotic only) falls below a threshold, since a plasmid
+   that doesn't even survive plain selection isn't a usable data point for
+   anything downstream.
 3. Normalise: each binder's count -> relative frequency within its sample
    (total-read-depth normalisation), with a pseudocount so zero-count
    binders don't blow up on the log scale.
-4. log2 fold-changes:
-   - each induced condition vs. no-inducer, as a sanity check that
-     induction is doing something at all;
-   - **the actual answer**: toxin+library vs. toxin-only (at each IPTG
-     level) - this isolates the protective effect of inducing the binder
-     while the toxin is present, i.e. which binders rescue growth.
-5. Replicate consistency: correlate A vs. B, both on normalised frequency
+4. Innate toxicity (context only): log2FC of `library_only` vs. `no_inducer`
+   at each IPTG level - how costly is overexpressing this binder on its own,
+   with no toxin present? Reported for interpretation, not used to correct
+   the main result.
+5. **The actual answer**: log2FC of toxin+library vs. toxin-only (at each
+   IPTG level) - isolates the protective effect of inducing the binder while
+   the toxin is present. (No GFP/neutral-overexpression control is available
+   in this sequencing-based run, so unlike the plate-based assay this ratio
+   isn't further normalised against one - see the caveat in the notebook.)
+6. Replicate consistency: correlate A vs. B, both on normalised frequency
    and on the derived log2FC, and flag any binder where the two replicates
    disagree before trusting it as a hit.
-6. Final ranked hit table + plot of the top consistently-enriched binders,
+7. Final ranked hit table + plot of the top consistently-enriched binders,
    written to `results/final_binder_ranking.csv`.

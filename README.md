@@ -149,10 +149,13 @@ these:
   (`Python`/`Pysam` are for `count_reads_per_binder.py`, called at the end
   of that script - BWA/SAMtools alone don't cover it)
 
-- **Analysis** (`analysis/DMS_analysis.Rmd`): R with `tidyverse` and
-  `scales`:
+- **Analysis** (`analysis/DMS_analysis.Rmd`): R with `tidyverse`, `scales`,
+  and `DESeq2` (Bioconductor, used for the count-based hit-calling in
+  Section 5):
   ```r
   install.packages(c("tidyverse", "scales", "rmarkdown"))
+  if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+  BiocManager::install("DESeq2")
   ```
 
 ## The analysis logic (see `analysis/DMS_analysis.Rmd` for the full walkthrough)
@@ -163,11 +166,14 @@ same core comparison (toxin+library vs. toxin-only), with `no_inducer` and
 
 1. Load `results/binder_counts.tsv` (long format: sample, binder, count) +
    `config/samples.tsv` metadata; reshape into a binder x sample table.
-2. QC: read depth and number of binders detected per sample, then a
-   **viability filter** - drop any binder whose mean read count under
-   `no_inducer` (antibiotic only) falls below a threshold, since a plasmid
-   that doesn't even survive plain selection isn't a usable data point for
-   anything downstream.
+2. QC: read depth and number of binders detected per sample, a **library
+   complexity check** - since this is a competitive pooled assay, a handful
+   of binders dominating the pool squeezes everyone else into very few
+   reads regardless of biology, so check for that before trusting anything
+   downstream - and a **viability filter** - drop any binder whose mean read
+   count under `no_inducer` (antibiotic only) falls below a threshold, since
+   a plasmid that doesn't even survive plain selection isn't a usable data
+   point for anything downstream.
 3. Normalise: each binder's count -> relative frequency within its sample
    (total-read-depth normalisation), with a pseudocount so zero-count
    binders don't blow up on the log scale.
@@ -175,16 +181,24 @@ same core comparison (toxin+library vs. toxin-only), with `no_inducer` and
    at each IPTG level - how costly is overexpressing this binder on its own,
    with no toxin present? Reported for interpretation, not used to correct
    the main result.
-5. **The actual answer**: log2FC of toxin+library vs. toxin-only (at each
-   IPTG level) - isolates the protective effect of inducing the binder while
-   the toxin is present. (No GFP/neutral-overexpression control is available
-   in this sequencing-based run, so unlike the plate-based assay this ratio
-   isn't further normalised against one - see the caveat in the notebook.)
-6. Replicate consistency: correlate A vs. B, both on normalised frequency
-   and on the derived log2FC, and flag any binder where the two replicates
-   disagree before trusting it as a hit.
-7. Final ranked hit table + plot of the top consistently-enriched binders,
-   written to `results/final_binder_ranking.csv`.
+5. **The actual answer**: a quick simple frequency-ratio log2FC of
+   toxin+library vs. toxin-only first (no GFP/neutral-overexpression control
+   is available in this sequencing-based run, so unlike the plate-based
+   assay this ratio isn't further normalised against one - see the caveat in
+   the notebook), then a proper count-based test (**DESeq2**) on the same
+   comparison - it models counts with a negative binomial distribution and
+   gives each binder an honestly wide or narrow uncertainty estimate
+   depending on how much read depth actually backs it, rather than treating
+   every point estimate as equally trustworthy the way the simple ratio
+   does.
+6. Replicate reproducibility: correlate normalised frequency between
+   replicate A and B (DESeq2 already folds replicate variation into its
+   model in step 5, so there's no separate manual consistency check needed
+   for its result).
+7. Final ranked hit table: the DESeq2 result ranked by q-value (or the
+   simple ratio, marked provisional, if only one replicate exists yet),
+   with binders averaging too few reads flagged (not excluded) as
+   `low_count`, written to `results/final_binder_ranking.csv`.
 8. Comparison to the collaborator's published plate-based screen of the same
    binders (`data/plate_assay_reference_hits.tsv`, filtered to the Sen2
    retron) - a rough sanity check on direction/ranking, not a strict

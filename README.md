@@ -48,6 +48,9 @@ slurm/submit_pipeline.sh           submits the same 3 scripts via sbatch, chaine
 environment.yml                    conda env for the demux/QC/alignment tools (fallback if your cluster has no modules for them)
 analysis/
   DMS_analysis.Rmd                 the actual DMS-style analysis (normalisation, log2FC, replicate QC, hit table)
+  DMS_analysis_expression_batches.Rmd  variant that splits the panel into high-/low-expressing batches before
+                                        normalising, so a handful of dominant binders can't compositionally
+                                        drown out the comparison for everyone else - see its own Section 0
 results/                           binder_counts.tsv and everything the R notebook produces (gitignored except final CSV)
 ```
 

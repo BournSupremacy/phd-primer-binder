@@ -13,7 +13,7 @@ after selection is a readout of how well it protects the cell**: the better
 a binder blocks RcaT, the more its carrier cells survive, and the more reads
 it contributes to the pool.
 
-12 samples: 6 conditions x 2 biological replicates (A/B).
+6 samples: one per condition (no biological replicates).
 
 | Condition | Ara (toxin inducer) | IPTG (binder inducer) |
 |---|---|---|
@@ -47,7 +47,7 @@ run_pipeline.sh                    convenience wrapper that runs 00->01->02 in o
 slurm/submit_pipeline.sh           submits the same 3 scripts via sbatch, chained with job dependencies - see "Running on a SLURM cluster"
 environment.yml                    conda env for the demux/QC/alignment tools (fallback if your cluster has no modules for them)
 analysis/
-  DMS_analysis.Rmd                 the actual DMS-style analysis (normalisation, log2FC, replicate QC, hit table)
+  DMS_analysis.Rmd                 the actual DMS-style analysis (normalisation, log2FC, low-count flagging, hit table)
   DMS_analysis_expression_batches.Rmd  variant that splits the panel into high-/low-expressing batches before
                                         normalising, so a handful of dominant binders can't compositionally
                                         drown out the comparison for everyone else - see its own Section 0
@@ -152,20 +152,20 @@ these:
   (`Python`/`Pysam` are for `count_reads_per_binder.py`, called at the end
   of that script - BWA/SAMtools alone don't cover it)
 
-- **Analysis** (`analysis/DMS_analysis.Rmd`): R with `tidyverse`, `scales`,
-  and `DESeq2` (Bioconductor, used for the count-based hit-calling in
-  Section 5):
+- **Analysis** (`analysis/DMS_analysis.Rmd`): R with `tidyverse` and
+  `scales`:
   ```r
   install.packages(c("tidyverse", "scales", "rmarkdown"))
-  if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-  BiocManager::install("DESeq2")
   ```
 
 ## The analysis logic (see `analysis/DMS_analysis.Rmd` for the full walkthrough)
 
-This mirrors the lab's existing plate-based version of the same assay: the
-same core comparison (toxin+library vs. toxin-only), with `no_inducer` and
-`library_only` used as QC/context steps rather than as normalisation inputs.
+This mirrors the lab's existing plate-based version of the same assay, with
+`no_inducer` used as a QC/viability step rather than a normalisation input.
+There's a single sample per condition (no biological replicates), so every
+log2FC below is a one-off point estimate - there's no replicate-consistency
+check, and no count-based statistical test like DESeq2 (those need at least
+2 replicates per condition to estimate dispersion, so none is used here).
 
 1. Load `results/binder_counts.tsv` (long format: sample, binder, count) +
    `config/samples.tsv` metadata; reshape into a binder x sample table.
@@ -173,7 +173,7 @@ same core comparison (toxin+library vs. toxin-only), with `no_inducer` and
    complexity check** - since this is a competitive pooled assay, a handful
    of binders dominating the pool squeezes everyone else into very few
    reads regardless of biology, so check for that before trusting anything
-   downstream - and a **viability filter** - drop any binder whose mean read
+   downstream - and a **viability filter** - drop any binder whose read
    count under `no_inducer` (antibiotic only) falls below a threshold, since
    a plasmid that doesn't even survive plain selection isn't a usable data
    point for anything downstream.
@@ -184,25 +184,19 @@ same core comparison (toxin+library vs. toxin-only), with `no_inducer` and
    at each IPTG level - how costly is overexpressing this binder on its own,
    with no toxin present? Reported for interpretation, not used to correct
    the main result.
-5. **The actual answer**: a quick simple frequency-ratio log2FC of
-   toxin+library vs. toxin-only first (no GFP/neutral-overexpression control
-   is available in this sequencing-based run, so unlike the plate-based
-   assay this ratio isn't further normalised against one - see the caveat in
-   the notebook), then a proper count-based test (**DESeq2**) on the same
-   comparison - it models counts with a negative binomial distribution and
-   gives each binder an honestly wide or narrow uncertainty estimate
-   depending on how much read depth actually backs it, rather than treating
-   every point estimate as equally trustworthy the way the simple ratio
-   does.
-6. Replicate reproducibility: correlate normalised frequency between
-   replicate A and B (DESeq2 already folds replicate variation into its
-   model in step 5, so there's no separate manual consistency check needed
-   for its result).
-7. Final ranked hit table: the DESeq2 result ranked by q-value (or the
-   simple ratio, marked provisional, if only one replicate exists yet),
-   with binders averaging too few reads flagged (not excluded) as
-   `low_count`, written to `results/final_binder_ranking.csv`.
-8. Comparison to the collaborator's published plate-based screen of the same
+5. **The actual answer**: log2FC of toxin+library vs. **library-only, at the
+   matched IPTG level** - both arms have the binder induced at the same
+   level, so each binder's own overexpression cost is present on both sides
+   and should mostly cancel out, leaving mainly the effect of adding the
+   toxin on top of an already-expressed binder. (Not a full substitute for a
+   true GFP/neutral-overexpression control, which the plate-based assay uses
+   and this sequencing-based run doesn't have - see the caveat in the
+   notebook.)
+6. Final ranked hit table: binders averaging too few reads across the
+   compared conditions are flagged (not excluded) as `low_count`, since a
+   single point estimate backed by only a handful of reads is mostly
+   sampling noise - written to `results/final_binder_ranking.csv`.
+7. Comparison to the collaborator's published plate-based screen of the same
    binders (`data/plate_assay_reference_hits.tsv`, filtered to the Sen2
    retron) - a rough sanity check on direction/ranking, not a strict
    validation (their effect size uses a different baseline), written to

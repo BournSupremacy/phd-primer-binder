@@ -17,11 +17,12 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.width =
 
 We designed 88 candidate binders against the RcaT toxin. Cells carrying the
 pooled binder library were grown under 6 conditions (no inducer, toxin-only,
-library-only at two IPTG levels, and toxin+library at two IPTG levels), each
-in duplicate (A/B). RcaT kills the cell unless it's bound/inhibited, so **a
-binder's relative read count after selection is a proxy for how well it
-protects the cell** - good binders get relatively enriched when both the
-toxin and the binder are induced together.
+library-only at two IPTG levels, and toxin+library at two IPTG levels), one
+sample per condition (no biological replicates - see the note below). RcaT
+kills the cell unless it's bound/inhibited, so **a binder's relative read
+count after selection is a proxy for how well it protects the cell** - good
+binders get relatively enriched when both the toxin and the binder are
+induced together.
 
 This mirrors the lab's existing plate-based version of the same assay, and
 uses the same three roles for the 6 conditions:
@@ -32,13 +33,20 @@ uses the same three roles for the 6 conditions:
   than showing up later as a meaningless fold-change.
 - **library_only** (IPTG only, two levels, no toxin): tells you the *innate*
   toxicity of overexpressing each binder on its own, with no RcaT present -
-  reported for context, not used to correct the main result.
-- **toxin_only** vs. **toxin_plus_library**: the actual comparison. Does
-  inducing the binder rescue growth under toxin challenge, relative to toxin
-  alone? The plate-based version of this assay additionally normalises both
-  arms against a GFP-only control plasmid; we don't have an equivalent GFP
-  control in this sequencing-based setup, so this is the direct,
-  un-normalised version of that same ratio (see the caveat in Section 5).
+  reported for context in Section 4, and also used as the baseline for the
+  main comparison below.
+- **toxin_plus_library vs. library_only, matched IPTG level**: the actual
+  comparison. Both arms have the binder induced at the same level, so each
+  binder's own overexpression cost is present on both sides of the ratio and
+  should mostly cancel out - what's left over is specifically the effect of
+  adding the toxin on top of an already-expressed binder (see Section 5).
+
+**No replicates**: this run has a single sample per condition. Every value
+below is a one-off point estimate, not an average of replicates - there's no
+A-vs-B consistency check to lean on, and no count-based statistical test
+(DESeq2 and similar tools need at least 2 replicates per condition to
+estimate dispersion, so none is used here). Section 6's low-read-count flag
+is the main safeguard against over-trusting a noisy point estimate.
 
 Steps below:
 
@@ -49,20 +57,14 @@ Steps below:
    binders that don't survive no-inducer selection.
 3. Normalise within each sample (sequencing depth differs sample to sample).
 4. Innate toxicity: library-only vs. no-inducer, as context only.
-5. The actual question: toxin+library vs. toxin-only - a quick simple-ratio
-   look, then a proper count-based test (DESeq2) that accounts for how much
-   read depth actually backs each binder's estimate.
-6. Replicate reproducibility (raw frequency, A vs. B).
-7. Final ranked hit table, flagging binders with too little read depth to
+5. The actual question: toxin+library vs. library-only, at matched IPTG
+   levels.
+6. Final ranked hit table, flagging binders with too little read depth to
    trust regardless of what their point estimate says.
-8. Compare against the collaborator's published plate-based screen of the
+7. Compare against the collaborator's published plate-based screen of the
    same binders (Sen2 retron), as an independent sanity check.
 
 ```{r libraries}
-# DESeq2 (and its Bioconductor dependencies) redefine several dplyr verbs
-# (count, desc, slice, rename, first...) - load it BEFORE tidyverse so
-# tidyverse's versions win and the rest of this notebook behaves as written.
-library(DESeq2)      # count-based hit-calling in Section 5
 library(tidyverse)   # readr, dplyr, tidyr, ggplot2, purrr
 library(scales)      # nice axis labels
 ```
@@ -81,22 +83,8 @@ samples     <- read_tsv("../config/samples.tsv", show_col_types = FALSE)
 # see below, not a row that silently disappears from the analysis.
 counts_long <- counts_long %>%
   complete(binder_id, sample_id = samples$sample_id, fill = list(count = 0)) %>%
-  left_join(samples %>% select(sample_id, condition, replicate, ara_pct, iptg_mM),
+  left_join(samples %>% select(sample_id, condition, ara_pct, iptg_mM),
             by = "sample_id")
-
-# Section 5b (DESeq2) needs both replicates to estimate dispersion, and
-# Section 6 compares replicate A against replicate B directly - only
-# possible if both actually exist in this run (e.g. not yet true for a
-# single-replicate test run before the full experiment). Everything before
-# Section 5b works identically either way, since averaging one value is a
-# no-op.
-has_replicates <- all(c("A", "B") %in% unique(samples$replicate))
-if (!has_replicates) {
-  message("Only replicate(s) ", paste(unique(samples$replicate), collapse = ", "),
-          " present - Section 5b's DESeq2 test and Section 6's A-vs-B consistency check ",
-          "will be skipped, and the final hit table will be marked provisional ",
-          "(not replicate-validated). Re-run this notebook once both replicates exist.")
-}
 
 head(counts_long)
 ```
@@ -116,7 +104,7 @@ counts_wide
 
 ```{r qc-depth}
 depth <- counts_long %>%
-  group_by(sample_id, condition, replicate) %>%
+  group_by(sample_id, condition) %>%
   summarise(total_reads = sum(count), n_binders_detected = sum(count > 0), .groups = "drop")
 
 depth %>%
@@ -184,7 +172,7 @@ and `toxin_only`/`toxin_plus_library` (after) about equally; if so, it's a
 starting-pool problem, not a growth-advantage-under-treatment one. Either
 way, it means most of the panel is read-starved and any single-point log2FC
 for them will be dominated by sampling noise - keep this in mind in
-Section 5b and the low-read-count flag in Section 7.
+Section 5 and the low-read-count flag in Section 6.
 
 ### Viability filter: drop binders that don't survive no-inducer selection
 
@@ -193,33 +181,32 @@ The plate-based version of this assay uses the no-inducer condition
 all - a binder that's already essentially gone before any toxin or induction
 step isn't a meaningful data point for anything downstream, and would just
 show up later as a huge, meaningless fold-change from a near-empty
-denominator. We do the same thing here: drop any binder whose average read
-count under `no_inducer` falls below a minimum threshold, before any
-normalisation or comparison.
+denominator. We do the same thing here: drop any binder whose read count
+under `no_inducer` falls below a minimum threshold, before any normalisation
+or comparison.
 
 ```{r viability-filter}
 min_no_inducer_reads <- 10  # tune by eye against the histogram below
 
 no_inducer_counts <- counts_long %>%
   filter(condition == "no_inducer") %>%
-  group_by(binder_id) %>%
-  summarise(mean_no_inducer_count = mean(count), .groups = "drop")
+  select(binder_id, no_inducer_count = count)
 
 no_inducer_counts %>%
-  ggplot(aes(x = mean_no_inducer_count)) +
+  ggplot(aes(x = no_inducer_count)) +
   geom_histogram(bins = 30) +
   geom_vline(xintercept = min_no_inducer_reads, linetype = "dashed", colour = "red") +
-  labs(x = "Mean no_inducer read count", y = "Number of binders",
+  labs(x = "no_inducer read count", y = "Number of binders",
        title = "Choosing the viability threshold",
        subtitle = paste("Dashed line: current threshold =", min_no_inducer_reads)) +
   theme_minimal()
 
 dead_binders <- no_inducer_counts %>%
-  filter(mean_no_inducer_count < min_no_inducer_reads) %>%
+  filter(no_inducer_count < min_no_inducer_reads) %>%
   pull(binder_id)
 
 if (length(dead_binders) > 0) {
-  message(length(dead_binders), " binder(s) dropped as non-viable (mean no_inducer count < ",
+  message(length(dead_binders), " binder(s) dropped as non-viable (no_inducer count < ",
           min_no_inducer_reads, "): ", paste(dead_binders, collapse = ", "))
 } else {
   message("No binders dropped - all binders survive no-inducer selection above threshold.")
@@ -259,16 +246,11 @@ counts_norm %>% select(sample_id, binder_id, count, total_reads, freq) %>% head(
 
 ## 4. Innate toxicity of overexpression (reference only)
 
-We average the two replicates' normalised frequency for each condition
-first, then take log2 ratios between conditions. (Section 6 checks the
-replicates actually agree with each other before we lean on this average.)
+```{r condition-freq}
+condition_freq <- counts_norm %>%
+  select(condition, binder_id, freq)
 
-```{r condition-means}
-condition_means <- counts_norm %>%
-  group_by(condition, binder_id) %>%
-  summarise(mean_freq = mean(freq), .groups = "drop")
-
-condition_means %>% head()
+condition_freq %>% head()
 ```
 
 This isn't part of the actual hit-calling comparison in Section 5 - it's
@@ -278,14 +260,14 @@ cell on its own, with no toxin present at all (`library_only` vs.
 `no_inducer`, at both IPTG levels)?
 
 ```{r innate-toxicity}
-baseline <- condition_means %>%
+baseline <- condition_freq %>%
   filter(condition == "no_inducer") %>%
-  select(binder_id, baseline_freq = mean_freq)
+  select(binder_id, baseline_freq = freq)
 
-innate_toxicity <- condition_means %>%
+innate_toxicity <- condition_freq %>%
   filter(condition %in% c("library_only_0.1mM", "library_only_1mM")) %>%
   left_join(baseline, by = "binder_id") %>%
-  mutate(log2FC = log2(mean_freq / baseline_freq))
+  mutate(log2FC = log2(freq / baseline_freq))
 
 innate_toxicity %>%
   ggplot(aes(x = binder_id, y = log2FC)) +
@@ -302,196 +284,79 @@ Binders far to the negative side here are costly to overexpress regardless
 of RcaT - worth keeping in mind if they also show up near the top of the hit
 table below (see the caveat in Section 5).
 
-## 5. The actual question: toxin+library vs. toxin-only
+## 5. The actual question: toxin+library vs. library-only (matched IPTG level)
 
-This is the direct comparison the plate-based version of this assay makes
-(there, both arms are additionally normalised against a GFP-only control
-plasmid to correct for general overexpression burden; we don't have an
-equivalent GFP control in this sequencing-based setup, so this is the
-un-normalised version of that same ratio). We do this at both IPTG
-concentrations.
-
-### 5a. Quick look: simple frequency ratio
+Both arms here have the binder induced at the same IPTG level, so each
+binder's own overexpression cost is present on both sides of the ratio and
+should mostly cancel out - what's left over is mainly the effect of adding
+the toxin on top of an already-expressed binder. (An earlier version of this
+notebook compared against `toxin_only` instead - with no IPTG at all there,
+that comparison ended up dominated by each binder's own innate overexpression
+cost, which has nothing to do with RcaT. Matching the IPTG level removes
+most of that confound.)
 
 ```{r key-comparison}
-toxin_only_mean <- condition_means %>%
-  filter(condition == "toxin_only") %>%
-  select(binder_id, toxin_only_freq = mean_freq)
+library_only_freq <- condition_freq %>%
+  filter(condition %in% c("library_only_0.1mM", "library_only_1mM")) %>%
+  mutate(iptg_level = str_remove(condition, "library_only_")) %>%
+  select(binder_id, iptg_level, library_only_freq = freq)
 
-key_comparison <- condition_means %>%
+key_comparison <- condition_freq %>%
   filter(condition %in% c("toxin_plus_library_0.1mM", "toxin_plus_library_1mM")) %>%
-  left_join(toxin_only_mean, by = "binder_id") %>%
-  mutate(log2FC = log2(mean_freq / toxin_only_freq))
+  mutate(iptg_level = str_remove(condition, "toxin_plus_library_")) %>%
+  left_join(library_only_freq, by = c("binder_id", "iptg_level")) %>%
+  mutate(log2FC = log2(freq / library_only_freq)) %>%
+  select(-iptg_level)
 
 key_comparison %>%
   ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC, fill = condition)) +
   geom_col(position = "dodge") +
   coord_flip() +
-  labs(x = "Binder", y = "log2FC vs. toxin-only",
+  labs(x = "Binder", y = "log2FC vs. library-only (same IPTG level)",
        title = "Enrichment of each binder when co-induced with toxin",
-       subtitle = "Positive = binder rescues growth (protective) relative to toxin alone") +
+       subtitle = "Positive = binder does better under toxin challenge than its own baseline without toxin") +
   theme_minimal()
 ```
 
-**Caveat:** without a GFP (or other neutral-overexpression) control, this
-comparison can't fully separate RcaT-specific protection from a binder
-simply being cheap to overexpress. Cross-check any top hit against the
+**Caveat:** this assumes each binder's own overexpression cost is about the
+same with or without toxin present - a reasonable first approximation, but
+not guaranteed (the extra stress of active RcaT could itself change how
+costly a binder is to express). It's also not a substitute for a true GFP
+(neutral-overexpression) control, which the plate-based version of this
+assay uses and we don't have here. Cross-check any top hit against the
 innate toxicity plot above (a hit that's also very costly to overexpress on
 its own is less convincing) and against the 0.1 mM vs. 1 mM dose response
-below (a true binder should show *more* protection at higher induction; a
-burden artifact generally doesn't).
+(a true binder should show *more* protection at higher induction; a burden
+artifact generally doesn't).
 
-**A second problem with this simple ratio**: it treats every binder's
-estimate as equally trustworthy, which Section 2's library-complexity check
-showed isn't true here - most binders are backed by very few reads because
-a handful of clones dominate the pool. A binder whose count happens to go
-from 3 reads to 8 gets exactly the same kind of log2FC number above as one
-whose count goes from 30,000 to 80,000, with nothing here to tell them
-apart.
+**With a single sample per condition**, every value above is a one-off point
+estimate - there's no replicate to check it against, and no count-based
+statistical test (DESeq2 and similar tools need at least 2 replicates per
+condition) to give it a proper uncertainty estimate. Section 6's
+low-read-count flag is the main safeguard against over-trusting a noisy
+point estimate; it doesn't replace having a second replicate.
 
-### 5b. A count-based test that knows how much to trust each binder
+## 6. Final ranked hit table
 
-[DESeq2](https://bioconductor.org/packages/DESeq2/) works directly on raw
-counts instead of pre-computed frequencies. It models counts with a negative
-binomial distribution, and - since two replicates isn't enough to estimate
-noise per binder from scratch - borrows strength across all binders to
-learn a shared mean-variance trend. That lets it give a low-count binder an
-honestly wide, usually-not-significant result instead of a falsely
-confident point estimate, and its size-factor normalisation is built to be
-robust to a handful of highly-abundant binders dominating the read total
-(exactly Section 2's finding), unlike dividing every count by the sample's
-total reads. It also gives a p-value and a multiple-testing-corrected q-value
-(`padj`) per binder - useful once you're testing ~80 of them at once.
-
-This needs at least 2 replicates per condition to estimate dispersion, so
-it's skipped for a single-replicate run (the simple ratio above is used
-instead, marked provisional in the final hit table).
-
-```{r deseq2-hit-calling}
-if (has_replicates) {
-  deseq_counts <- counts_long %>%
-    select(binder_id, sample_id, count) %>%
-    pivot_wider(names_from = sample_id, values_from = count, values_fill = 0) %>%
-    column_to_rownames("binder_id") %>%
-    as.matrix()
-
-  deseq_coldata <- samples %>%
-    filter(sample_id %in% colnames(deseq_counts)) %>%
-    column_to_rownames("sample_id")
-  deseq_coldata <- deseq_coldata[colnames(deseq_counts), , drop = FALSE]
-  deseq_coldata$condition <- relevel(factor(deseq_coldata$condition), ref = "toxin_only")
-
-  dds <- DESeqDataSetFromMatrix(countData = deseq_counts, colData = deseq_coldata, design = ~condition)
-  # "poscounts" (rather than DESeq2's default) copes with how many binders
-  # have a zero count in at least one sample - expected given how skewed
-  # this library is - which would otherwise make the default size-factor
-  # estimator fail.
-  dds <- estimateSizeFactors(dds, type = "poscounts")
-  dds <- DESeq(dds)
-
-  extract_contrast <- function(cond) {
-    results(dds, contrast = c("condition", cond, "toxin_only")) %>%
-      as.data.frame() %>%
-      rownames_to_column("binder_id") %>%
-      mutate(condition = cond)
-  }
-
-  deseq_results <- bind_rows(
-    extract_contrast("toxin_plus_library_0.1mM"),
-    extract_contrast("toxin_plus_library_1mM")
-  ) %>%
-    rename(log2FC = log2FoldChange)
-
-  deseq_results %>%
-    ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC, fill = padj < 0.05)) +
-    geom_col() +
-    geom_errorbar(aes(ymin = log2FC - lfcSE, ymax = log2FC + lfcSE), width = 0.2, alpha = 0.5) +
-    coord_flip() +
-    facet_wrap(~condition) +
-    scale_fill_manual(values = c(`TRUE` = "steelblue", `FALSE` = "grey70"), na.value = "grey70", name = "padj < 0.05") +
-    labs(x = "Binder", y = "DESeq2 log2FC vs. toxin-only",
-         title = "Enrichment of each binder when co-induced with toxin (DESeq2)",
-         subtitle = "Error bars = standard error - low-count binders naturally get wide bars and rarely reach significance") +
-    theme_minimal()
-} else {
-  message("Skipping DESeq2 - it needs at least 2 replicates per condition to estimate dispersion, ",
-          "and only one replicate is present in this run.")
-}
-```
-
-## 6. Replicate reproducibility
-
-Before trusting either result above, check that replicate A and replicate B
-agree on normalised frequency (library complexity/correlation). DESeq2
-already folds replicate-to-replicate variation directly into its model in
-Section 5b (that's what `lfcSE`/`padj` reflect), so there's no separate
-manual A-vs-B consistency check needed for its result - this is a check on
-the raw data feeding into it, not a second hit-calling step.
-
-```{r replicate-freq-correlation}
-if (has_replicates) {
-  rep_wide <- counts_norm %>%
-    select(sample_id, binder_id, freq, condition, replicate) %>%
-    pivot_wider(id_cols = c(binder_id, condition), names_from = replicate, values_from = freq)
-
-  print(
-    rep_wide %>%
-      ggplot(aes(x = A, y = B)) +
-      geom_point(alpha = 0.6) +
-      geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey40") +
-      scale_x_log10(labels = label_number()) +
-      scale_y_log10(labels = label_number()) +
-      facet_wrap(~condition) +
-      labs(title = "Replicate A vs B: normalised binder frequency", x = "Rep A freq", y = "Rep B freq") +
-      theme_minimal()
-  )
-
-  rep_wide %>%
-    group_by(condition) %>%
-    summarise(pearson_r = cor(log10(A), log10(B), use = "complete.obs"), .groups = "drop")
-} else {
-  message("Skipping - only one replicate present.")
-}
-```
-
-## 7. Final ranked hit table
-
-With replicates, this is the DESeq2 result from Section 5b, ranked by
-`padj`. Without replicates (a single-replicate test run), it falls back to
-the simple ratio from Section 5a instead, marked **provisional** - nothing
-in that case has been checked for reproducibility or given a proper
-uncertainty estimate.
-
-Either way, binders with too little read depth to trust are flagged rather
-than dropped - `low_count` binders can still show a big log2FC, but Section
-2's library-complexity check means that's exactly the group most likely to
-be sampling noise, so treat them with real caution regardless of how they
-rank.
+Binders with too little read depth to trust are flagged rather than
+dropped - `low_count` binders can still show a big log2FC, but Section 2's
+library-complexity check means that's exactly the group most likely to be
+sampling noise, so treat them with real caution regardless of how they rank.
 
 ```{r final-hits}
-low_count_threshold <- 20  # flag (don't exclude) binders averaging fewer reads than this across the comparison - tune by eye against Section 2
+low_count_threshold <- 20  # flag (don't exclude) binders averaging fewer reads than this across the compared conditions - tune by eye against Section 2
 
-if (has_replicates) {
-  hit_results <- deseq_results %>%
-    mutate(low_count = baseMean < low_count_threshold, provisional = FALSE) %>%
-    select(binder_id, condition, log2FC, lfcSE, pvalue, padj, baseMean, low_count, provisional) %>%
-    arrange(condition, padj)
-} else {
-  raw_mean_count <- counts_long %>%
-    filter(condition %in% c("toxin_only", "toxin_plus_library_0.1mM", "toxin_plus_library_1mM")) %>%
-    group_by(binder_id) %>%
-    summarise(baseMean = mean(count), .groups = "drop")
+raw_mean_count <- counts_long %>%
+  filter(condition %in% c("library_only_0.1mM", "library_only_1mM",
+                           "toxin_plus_library_0.1mM", "toxin_plus_library_1mM")) %>%
+  group_by(binder_id) %>%
+  summarise(baseMean = mean(count), .groups = "drop")
 
-  hit_results <- key_comparison %>%
-    left_join(raw_mean_count, by = "binder_id") %>%
-    mutate(low_count = baseMean < low_count_threshold, provisional = TRUE,
-           lfcSE = NA_real_, pvalue = NA_real_, padj = NA_real_) %>%
-    select(binder_id, condition, log2FC, lfcSE, pvalue, padj, baseMean, low_count, provisional) %>%
-    arrange(condition, desc(log2FC))
-
-  message("Single replicate present - using the simple frequency ratio (Section 5a) instead of ",
-          "DESeq2, which needs replicates to estimate dispersion. Treat this table as provisional.")
-}
+hit_results <- key_comparison %>%
+  left_join(raw_mean_count, by = "binder_id") %>%
+  mutate(low_count = baseMean < low_count_threshold) %>%
+  select(binder_id, condition, log2FC, baseMean, low_count) %>%
+  arrange(condition, desc(log2FC))
 
 hit_results
 ```
@@ -502,12 +367,10 @@ hit_results %>%
   slice_max(log2FC, n = 20) %>%
   ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC, fill = low_count)) +
   geom_col() +
-  { if (has_replicates) geom_errorbar(aes(ymin = log2FC - lfcSE, ymax = log2FC + lfcSE), width = 0.2) } +
   coord_flip() +
   scale_fill_manual(values = c(`FALSE` = "steelblue", `TRUE` = "grey60"), name = "low read count") +
-  labs(x = "Binder", y = "log2FC vs. toxin-only (1 mM IPTG)",
-       title = paste("Top 20 RcaT binders by protection -",
-                      if (has_replicates) "DESeq2" else "simple ratio (provisional - single replicate)")) +
+  labs(x = "Binder", y = "log2FC vs. library-only (1 mM IPTG)",
+       title = "Top 20 RcaT binders by protection") +
   theme_minimal()
 ```
 
@@ -515,7 +378,7 @@ hit_results %>%
 write_csv(hit_results, "../results/final_binder_ranking.csv")
 ```
 
-## 8. Comparison to the published plate-based screen (Sen2 retron)
+## 7. Comparison to the published plate-based screen (Sen2 retron)
 
 Our collaborator ran an equivalent screen of these same binders with a
 plate-based assay and shared the results (`data/plate_assay_reference_hits.tsv`),
@@ -526,9 +389,11 @@ blocking/protective, matching the sign of a positive `log2FC` in our own
 result.
 
 **This isn't an apples-to-apples comparison**: their effect sizes are
-calculated against an IPTG-low baseline, not our toxin-only baseline, so
-treat this as a rough sanity check on direction and relative ranking, not a
-strict validation of magnitude.
+calculated against an IPTG-low baseline without further normalising
+toxin+library against library-only the way we do here, and they additionally
+correct both arms against a GFP control we don't have - so treat this as a
+rough sanity check on direction and relative ranking, not a strict
+validation of magnitude.
 
 ```{r load-plate-reference}
 plate_reference <- read_tsv("../data/plate_assay_reference_hits.tsv", show_col_types = FALSE) %>%
@@ -557,12 +422,12 @@ comparison %>%
   geom_smooth(method = "lm", se = FALSE, colour = "grey40", linetype = "dashed") +
   facet_wrap(~condition) +
   labs(x = "Published plate assay: log2(effect size), Sen2 (vs. IPTG-low)",
-       y = paste("This screen:", if (has_replicates) "DESeq2" else "simple ratio (provisional)", "log2FC (toxin+library vs. toxin-only)"),
+       y = "This screen: log2FC (toxin+library vs. library-only, matched IPTG)",
        title = "This screen vs. the published plate-based assay",
        colour = "Plate-assay hit call", shape = "Low read count") +
   theme_minimal()
 
-# Does excluding the low-read-count binders (flagged in Section 7) change
+# Does excluding the low-read-count binders (flagged in Section 6) change
 # the picture? If most of the disagreement comes from binders Section 2
 # already told us are read-starved, that's the library-complexity problem
 # showing up here too, not a real disagreement between the two assays.
@@ -582,11 +447,11 @@ write_csv(comparison, "../results/plate_assay_comparison.csv")
 ```
 
 A positive correlation here is reassuring, but don't over-read a weak one:
-this screen's baseline (toxin-only) and the plate assay's (IPTG-low) aren't
-the same condition, both assays have their own noise, and a binder missing
-from `plate_reference` above just wasn't in that dataset (check
-`n_binders_matched` against the number of viable binders from Section 2 to
-see how many actually got compared).
+this screen's baseline (library-only, matched IPTG) and the plate assay's
+(IPTG-low, GFP-corrected) aren't quite the same comparison, both assays have
+their own noise, and a binder missing from `plate_reference` above just
+wasn't in that dataset (check `n_binders_matched` against the number of
+viable binders from Section 2 to see how many actually got compared).
 
 ## Where to go from here
 
@@ -598,9 +463,13 @@ see how many actually got compared).
   source rather than needing to be corrected for downstream every time.
 * Consider also looking at the 0.1 mM vs 1 mM IPTG comparison directly - a
   true binder should show a dose response (more enrichment at higher
-  induction), which is another consistency check independent of replicates.
+  induction).
 * No GFP (or other neutral overexpression) control is included in this
-  sequencing-based run. If one gets added to a future run, normalising both
-  `toxin_only` and `toxin_plus_library` against it before taking the log2FC
-  in Section 5 would bring this in line with the plate-based assay's full
-  method and remove the caveat above.
+  sequencing-based run. Matching the IPTG level in Section 5 removes most of
+  the overexpression-burden confound, but a real GFP control would remove it
+  more rigorously and would bring this in line with the plate-based assay's
+  full method.
+* If a second replicate ever becomes available, re-running with both would
+  let you add a genuine A-vs-B consistency check and a count-based test
+  (DESeq2 or similar) that gives each binder a real uncertainty estimate
+  instead of relying on the low-read-count flag alone.

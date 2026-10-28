@@ -24,6 +24,11 @@ it contributes to the pool.
 | toxin_plus_library_0.1mM | 0.2% | 0.1 mM |
 | toxin_plus_library_1mM | 0.2% | 1 mM |
 
+The 1 mM IPTG conditions (`library_only_1mM`, `toxin_plus_library_1mM`) are
+sequenced but not part of the analysis - `DMS_analysis.Rmd` reads them in
+and drops them in Section 1, so the whole comparison runs on the 0.1 mM
+conditions only.
+
 Sequencing: Illumina MiSeq i100 5M, 150bp paired-end, dual PCR barcoding for
 demultiplexing.
 
@@ -166,30 +171,34 @@ There's a single sample per condition (no biological replicates), so every
 log2FC below is a one-off point estimate.
 
 1. Load `results/binder_counts.tsv` (long format: sample, binder, count) +
-   `config/samples.tsv` metadata; reshape into a binder x sample table.
+   `config/samples.tsv` metadata; reshape into a binder x sample table. The
+   1 mM IPTG conditions are read in here too, then immediately dropped -
+   nothing downstream ever sees them.
 2. QC: read depth and number of binders detected per sample, a **library
    complexity check** - since this is a competitive pooled assay, a handful
    of binders dominating the pool squeezes everyone else into very few
    reads regardless of biology, so check for that before trusting anything
-   downstream - and a **viability filter** - drop any binder whose read
-   count under `no_inducer` (antibiotic only) falls below a threshold, since
-   a plasmid that doesn't even survive plain selection isn't a usable data
-   point for anything downstream.
+   downstream - a **viability filter** - drop any binder whose read count
+   under `no_inducer` (antibiotic only) falls below a threshold, since a
+   plasmid that doesn't even survive plain selection isn't a usable data
+   point for anything downstream - and a **low-count filter** - drop any
+   binder whose mean read count across all the remaining samples falls
+   below a threshold (5 by default), since the viability filter alone
+   doesn't catch a binder that's merely thin everywhere else.
 3. Normalise: each binder's count -> relative frequency within its sample
    (total-read-depth normalisation), with a pseudocount so zero-count
    binders don't blow up on the log scale.
 4. Innate toxicity (context only): log2FC of `library_only` vs. `no_inducer`
-   at each IPTG level - how costly is overexpressing this binder on its own,
-   with no toxin present? Reported for interpretation, not used to correct
-   the main result.
-5. **The actual answer**: log2FC of toxin+library vs. **library-only, at the
-   matched IPTG level** - both arms have the binder induced at the same
-   level, so each binder's own overexpression cost is present on both sides
-   and should mostly cancel out, leaving mainly the effect of adding the
-   toxin on top of an already-expressed binder. (Not a full substitute for a
-   true GFP/neutral-overexpression control, which the plate-based assay uses
-   and this sequencing-based run doesn't have - see the caveat in the
-   notebook.)
+   - how costly is overexpressing this binder on its own, with no toxin
+   present? Reported for interpretation, not used to correct the main
+   result.
+5. **The actual answer**: log2FC of toxin+library vs. **library-only** (both
+   at 0.1 mM IPTG) - both arms have the binder induced at the same level, so
+   each binder's own overexpression cost is present on both sides and should
+   mostly cancel out, leaving mainly the effect of adding the toxin on top
+   of an already-expressed binder. (Not a full substitute for a true
+   GFP/neutral-overexpression control, which the plate-based assay uses and
+   this sequencing-based run doesn't have - see the caveat in the notebook.)
 6. Final ranked hit table, written to `results/final_binder_ranking.csv`.
 7. Comparison to the collaborator's published plate-based screen of the same
    binders (`data/plate_assay_reference_hits.tsv`, filtered to the Sen2

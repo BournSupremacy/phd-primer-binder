@@ -55,6 +55,12 @@ counts_long <- counts_long %>%
   left_join(samples %>% select(sample_id, condition, ara_pct, iptg_mM),
             by = "sample_id")
 
+# The 1 mM IPTG conditions (library_only_1mM, toxin_plus_library_1mM) are
+# sequenced but aren't part of this analysis - read in above like everything
+# else, then dropped here so nothing downstream ever sees them.
+counts_long <- counts_long %>%
+  filter(!condition %in% c("library_only_1mM", "toxin_plus_library_1mM"))
+
 head(counts_long)
 ```
 
@@ -137,6 +143,43 @@ if (length(dead_binders) > 0) {
 counts_long <- counts_long %>% filter(!(binder_id %in% dead_binders))
 ```
 
+### Low-count filter: drop binders too thinly covered overall
+
+The viability filter above only looks at `no_inducer`. A binder can still
+pass that and be backed by very few reads elsewhere - drop any binder whose
+mean read count across all the samples used here falls below a minimum
+threshold.
+
+```{r low-count-filter}
+min_mean_count <- 5  # tune by eye against the histogram below
+
+mean_counts <- counts_long %>%
+  group_by(binder_id) %>%
+  summarise(mean_count = mean(count), .groups = "drop")
+
+mean_counts %>%
+  ggplot(aes(x = mean_count)) +
+  geom_histogram(bins = 30) +
+  geom_vline(xintercept = min_mean_count, linetype = "dashed", colour = "red") +
+  labs(x = "Mean read count across all samples", y = "Number of binders",
+       title = "Choosing the low-count filter threshold",
+       subtitle = paste("Dashed line: current threshold =", min_mean_count)) +
+  theme_minimal()
+
+low_count_binders <- mean_counts %>%
+  filter(mean_count < min_mean_count) %>%
+  pull(binder_id)
+
+if (length(low_count_binders) > 0) {
+  message(length(low_count_binders), " binder(s) dropped for too few reads overall (mean count < ",
+          min_mean_count, "): ", paste(low_count_binders, collapse = ", "))
+} else {
+  message("No binders dropped - all binders average at least ", min_mean_count, " reads across all samples.")
+}
+
+counts_long <- counts_long %>% filter(!(binder_id %in% low_count_binders))
+```
+
 ### Splitting into high- and low-expressing batches
 
 Rank binders by their overall abundance (mean raw read count across *all*
@@ -212,57 +255,52 @@ run_batch_pipeline <- function(counts_batch) {
     select(binder_id, baseline_freq = freq)
 
   innate_toxicity <- condition_freq %>%
-    filter(condition %in% c("library_only_0.1mM", "library_only_1mM")) %>%
+    filter(condition == "library_only_0.1mM") %>%
     left_join(baseline, by = "binder_id") %>%
     mutate(log2FC = log2(freq / baseline_freq))
 
   p_innate_toxicity <- innate_toxicity %>%
     ggplot(aes(x = binder_id, y = log2FC)) +
     geom_col() +
-    facet_wrap(~condition, ncol = 1) +
     labs(x = "Binder", y = "log2FC vs. no_inducer",
          title = "Innate toxicity of overexpression (no toxin present)",
          subtitle = "Reference only - not used in hit-calling") +
     theme_minimal() +
     theme(axis.text.x = element_blank())
 
-  # The actual comparison: toxin+library vs. library-only, matched IPTG
-  # level. Both arms have the binder induced at the same level, so each
+  # The actual comparison: toxin+library vs. library-only, both at 0.1 mM
+  # IPTG. Both arms have the binder induced at the same level, so each
   # binder's own overexpression cost is present on both sides of the ratio
   # and should mostly cancel out - what's left is mainly the effect of
   # adding the toxin on top of an already-expressed binder.
   library_only_freq <- condition_freq %>%
-    filter(condition %in% c("library_only_0.1mM", "library_only_1mM")) %>%
-    mutate(iptg_level = str_remove(condition, "library_only_")) %>%
-    select(binder_id, iptg_level, library_only_freq = freq)
+    filter(condition == "library_only_0.1mM") %>%
+    select(binder_id, library_only_freq = freq)
 
   key_comparison <- condition_freq %>%
-    filter(condition %in% c("toxin_plus_library_0.1mM", "toxin_plus_library_1mM")) %>%
-    mutate(iptg_level = str_remove(condition, "toxin_plus_library_")) %>%
-    left_join(library_only_freq, by = c("binder_id", "iptg_level")) %>%
-    mutate(log2FC = log2(freq / library_only_freq)) %>%
-    select(-iptg_level)
+    filter(condition == "toxin_plus_library_0.1mM") %>%
+    left_join(library_only_freq, by = "binder_id") %>%
+    mutate(log2FC = log2(freq / library_only_freq))
 
   p_key_comparison <- key_comparison %>%
-    ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC, fill = condition)) +
-    geom_col(position = "dodge") +
+    ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC)) +
+    geom_col(fill = "steelblue") +
     coord_flip() +
-    labs(x = "Binder", y = "log2FC vs. library-only (same IPTG level)",
+    labs(x = "Binder", y = "log2FC vs. library-only",
          title = "Enrichment when co-induced with toxin (this batch only)",
          subtitle = "Positive = binder does better under toxin challenge than its own baseline without toxin") +
     theme_minimal()
 
   hit_results <- key_comparison %>%
     select(binder_id, condition, log2FC) %>%
-    arrange(condition, desc(log2FC))
+    arrange(desc(log2FC))
 
   p_final <- hit_results %>%
-    filter(condition == "toxin_plus_library_1mM") %>%
     slice_max(log2FC, n = 20) %>%
     ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC)) +
     geom_col(fill = "steelblue") +
     coord_flip() +
-    labs(x = "Binder", y = "log2FC vs. library-only (1 mM IPTG)",
+    labs(x = "Binder", y = "log2FC vs. library-only",
          title = "Top binders by protection (this batch only)") +
     theme_minimal()
 
@@ -291,19 +329,16 @@ compare_to_plate <- function(hit_results, plate_reference, batch_label) {
     ggplot(aes(x = plate_log2_efsize, y = log2FC, colour = plate_hit)) +
     geom_point(alpha = 0.7, size = 2) +
     geom_smooth(method = "lm", se = FALSE, colour = "grey40", linetype = "dashed") +
-    facet_wrap(~condition) +
     labs(x = "Published plate assay: log2(effect size), Sen2 (vs. IPTG-low)",
-         y = paste0(batch_label, "-batch log2FC (toxin+library vs. library-only, matched IPTG)"),
+         y = paste0(batch_label, "-batch log2FC (toxin+library vs. library-only)"),
          title = paste0("This screen (", batch_label, " batch) vs. the published plate-based assay"),
          colour = "Plate-assay hit call") +
     theme_minimal()
 
   cor_summary <- comparison %>%
-    group_by(condition) %>%
     summarise(
       pearson_r         = cor(log2FC, plate_log2_efsize, use = "complete.obs"),
-      n_binders_matched = n(),
-      .groups = "drop"
+      n_binders_matched = n()
     ) %>%
     mutate(batch = batch_label, .before = 1)
 
@@ -428,4 +463,4 @@ Compare the table above against `DMS_analysis.Rmd`'s unsplit
   assigned to a single batch for every comparison - if that matters for
   your data, consider a per-condition rather than per-binder split.
 * Everything in `DMS_analysis.Rmd`'s own "Where to go from here" still
-  applies here too (the dose-response check and the missing GFP control).
+  applies here too (the missing GFP control).

@@ -16,41 +16,41 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.width =
 ## 0. What this notebook does
 
 We designed 88 candidate binders against the RcaT toxin. Cells carrying the
-pooled binder library were grown under 6 conditions (no inducer, toxin-only,
-library-only at two IPTG levels, and toxin+library at two IPTG levels), one
-sample per condition. RcaT kills the cell unless it's bound/inhibited, so
-**a binder's relative read count after selection is a proxy for how well it
-protects the cell** - good binders get relatively enriched when both the
-toxin and the binder are induced together.
+pooled binder library were grown under conditions including no inducer,
+toxin-only, library-only, and toxin+library (all IPTG-induced conditions at
+0.1 mM), one sample per condition. RcaT kills the cell unless it's
+bound/inhibited, so **a binder's relative read count after selection is a
+proxy for how well it protects the cell** - good binders get relatively
+enriched when both the toxin and the binder are induced together.
 
 This mirrors the lab's existing plate-based version of the same assay, and
-uses the same three roles for the 6 conditions:
+uses the same three roles for these conditions:
 
 - **no_inducer** (antibiotic only): a viability check, not a comparison
   baseline. A binder that doesn't survive plain antibiotic selection isn't a
   usable data point for anything downstream, so it's dropped here rather
   than showing up later as a meaningless fold-change.
-- **library_only** (IPTG only, two levels, no toxin): tells you the *innate*
-  toxicity of overexpressing each binder on its own, with no RcaT present -
-  reported for context in Section 4, and also used as the baseline for the
-  main comparison below.
-- **toxin_plus_library vs. library_only, matched IPTG level**: the actual
-  comparison. Both arms have the binder induced at the same level, so each
-  binder's own overexpression cost is present on both sides of the ratio and
-  should mostly cancel out - what's left over is specifically the effect of
-  adding the toxin on top of an already-expressed binder (see Section 5).
+- **library_only** (IPTG only, no toxin): tells you the *innate* toxicity of
+  overexpressing each binder on its own, with no RcaT present - reported for
+  context in Section 4, and also used as the baseline for the main
+  comparison below.
+- **toxin_plus_library vs. library_only**: the actual comparison. Both arms
+  have the binder induced at the same level, so each binder's own
+  overexpression cost is present on both sides of the ratio and should
+  mostly cancel out - what's left over is specifically the effect of adding
+  the toxin on top of an already-expressed binder (see Section 5).
 
 Steps below:
 
 1. Load the counts table produced by `scripts/count_reads_per_binder.py`
    (`results/binder_counts.tsv`) and the sample metadata (`config/samples.tsv`).
 2. QC: read depth per sample, how many binders are detected, how evenly the
-   pool is represented across binders, and a viability filter that drops
-   binders that don't survive no-inducer selection.
+   pool is represented across binders, a viability filter that drops binders
+   that don't survive no-inducer selection, and a low-count filter that
+   drops binders too thinly covered overall to trust.
 3. Normalise within each sample (sequencing depth differs sample to sample).
 4. Innate toxicity: library-only vs. no-inducer, as context only.
-5. The actual question: toxin+library vs. library-only, at matched IPTG
-   levels.
+5. The actual question: toxin+library vs. library-only, at 0.1 mM IPTG.
 6. Final ranked hit table.
 7. Compare against the collaborator's published plate-based screen of the
    same binders (Sen2 retron), as an independent sanity check.
@@ -76,6 +76,13 @@ counts_long <- counts_long %>%
   complete(binder_id, sample_id = samples$sample_id, fill = list(count = 0)) %>%
   left_join(samples %>% select(sample_id, condition, ara_pct, iptg_mM),
             by = "sample_id")
+
+# The 1 mM IPTG conditions (library_only_1mM, toxin_plus_library_1mM) are
+# sequenced but aren't part of this analysis - read in above like everything
+# else, then dropped here so nothing downstream (QC, normalisation, the key
+# comparison) ever sees them.
+counts_long <- counts_long %>%
+  filter(!condition %in% c("library_only_1mM", "toxin_plus_library_1mM"))
 
 head(counts_long)
 ```
@@ -209,6 +216,43 @@ counts_long <- counts_long %>% filter(!(binder_id %in% dead_binders))
 Every plot and table from here on only includes binders that actually grow
 under plain antibiotic selection.
 
+### Low-count filter: drop binders too thinly covered overall
+
+The viability filter above only looks at `no_inducer`. A binder can still
+pass that and be backed by very few reads elsewhere - drop any binder whose
+mean read count across all the samples used here falls below a minimum
+threshold.
+
+```{r low-count-filter}
+min_mean_count <- 5  # tune by eye against the histogram below
+
+mean_counts <- counts_long %>%
+  group_by(binder_id) %>%
+  summarise(mean_count = mean(count), .groups = "drop")
+
+mean_counts %>%
+  ggplot(aes(x = mean_count)) +
+  geom_histogram(bins = 30) +
+  geom_vline(xintercept = min_mean_count, linetype = "dashed", colour = "red") +
+  labs(x = "Mean read count across all samples", y = "Number of binders",
+       title = "Choosing the low-count filter threshold",
+       subtitle = paste("Dashed line: current threshold =", min_mean_count)) +
+  theme_minimal()
+
+low_count_binders <- mean_counts %>%
+  filter(mean_count < min_mean_count) %>%
+  pull(binder_id)
+
+if (length(low_count_binders) > 0) {
+  message(length(low_count_binders), " binder(s) dropped for too few reads overall (mean count < ",
+          min_mean_count, "): ", paste(low_count_binders, collapse = ", "))
+} else {
+  message("No binders dropped - all binders average at least ", min_mean_count, " reads across all samples.")
+}
+
+counts_long <- counts_long %>% filter(!(binder_id %in% low_count_binders))
+```
+
 ## 3. Normalisation
 
 Sequencing depth differs between samples, so raw counts aren't directly
@@ -248,7 +292,7 @@ This isn't part of the actual hit-calling comparison in Section 5 - it's
 here purely as context, mirroring what the plate-based assay calls "innate
 toxicity of the plasmids": how much does overexpressing each binder cost the
 cell on its own, with no toxin present at all (`library_only` vs.
-`no_inducer`, at both IPTG levels)?
+`no_inducer`)?
 
 ```{r innate-toxicity}
 baseline <- condition_freq %>%
@@ -256,14 +300,13 @@ baseline <- condition_freq %>%
   select(binder_id, baseline_freq = freq)
 
 innate_toxicity <- condition_freq %>%
-  filter(condition %in% c("library_only_0.1mM", "library_only_1mM")) %>%
+  filter(condition == "library_only_0.1mM") %>%
   left_join(baseline, by = "binder_id") %>%
   mutate(log2FC = log2(freq / baseline_freq))
 
 innate_toxicity %>%
   ggplot(aes(x = binder_id, y = log2FC)) +
   geom_col() +
-  facet_wrap(~condition, ncol = 1) +
   labs(x = "Binder", y = "log2FC vs. no_inducer",
        title = "Innate toxicity of overexpression (no toxin present)",
        subtitle = "Reference only - not used in the hit-calling comparison below") +
@@ -275,7 +318,7 @@ Binders far to the negative side here are costly to overexpress regardless
 of RcaT - worth keeping in mind if they also show up near the top of the hit
 table below (see the caveat in Section 5).
 
-## 5. The actual question: toxin+library vs. library-only (matched IPTG level)
+## 5. The actual question: toxin+library vs. library-only (0.1 mM IPTG)
 
 Both arms here have the binder induced at the same IPTG level, so each
 binder's own overexpression cost is present on both sides of the ratio and
@@ -288,22 +331,19 @@ most of that confound.)
 
 ```{r key-comparison}
 library_only_freq <- condition_freq %>%
-  filter(condition %in% c("library_only_0.1mM", "library_only_1mM")) %>%
-  mutate(iptg_level = str_remove(condition, "library_only_")) %>%
-  select(binder_id, iptg_level, library_only_freq = freq)
+  filter(condition == "library_only_0.1mM") %>%
+  select(binder_id, library_only_freq = freq)
 
 key_comparison <- condition_freq %>%
-  filter(condition %in% c("toxin_plus_library_0.1mM", "toxin_plus_library_1mM")) %>%
-  mutate(iptg_level = str_remove(condition, "toxin_plus_library_")) %>%
-  left_join(library_only_freq, by = c("binder_id", "iptg_level")) %>%
-  mutate(log2FC = log2(freq / library_only_freq)) %>%
-  select(-iptg_level)
+  filter(condition == "toxin_plus_library_0.1mM") %>%
+  left_join(library_only_freq, by = "binder_id") %>%
+  mutate(log2FC = log2(freq / library_only_freq))
 
 key_comparison %>%
-  ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC, fill = condition)) +
-  geom_col(position = "dodge") +
+  ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC)) +
+  geom_col(fill = "steelblue") +
   coord_flip() +
-  labs(x = "Binder", y = "log2FC vs. library-only (same IPTG level)",
+  labs(x = "Binder", y = "log2FC vs. library-only",
        title = "Enrichment of each binder when co-induced with toxin",
        subtitle = "Positive = binder does better under toxin challenge than its own baseline without toxin") +
   theme_minimal()
@@ -315,29 +355,26 @@ not guaranteed (the extra stress of active RcaT could itself change how
 costly a binder is to express). It's also not a substitute for a true GFP
 (neutral-overexpression) control, which the plate-based version of this
 assay uses and we don't have here. Cross-check any top hit against the
-innate toxicity plot above (a hit that's also very costly to overexpress on
-its own is less convincing) and against the 0.1 mM vs. 1 mM dose response
-(a true binder should show *more* protection at higher induction; a burden
-artifact generally doesn't).
+innate toxicity plot above - a hit that's also very costly to overexpress on
+its own is less convincing.
 
 ## 6. Final ranked hit table
 
 ```{r final-hits}
 hit_results <- key_comparison %>%
   select(binder_id, condition, log2FC) %>%
-  arrange(condition, desc(log2FC))
+  arrange(desc(log2FC))
 
 hit_results
 ```
 
 ```{r final-plot}
 hit_results %>%
-  filter(condition == "toxin_plus_library_1mM") %>%
   slice_max(log2FC, n = 20) %>%
   ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC)) +
   geom_col(fill = "steelblue") +
   coord_flip() +
-  labs(x = "Binder", y = "log2FC vs. library-only (1 mM IPTG)",
+  labs(x = "Binder", y = "log2FC vs. library-only",
        title = "Top 20 RcaT binders by protection") +
   theme_minimal()
 ```
@@ -388,19 +425,16 @@ comparison %>%
   ggplot(aes(x = plate_log2_efsize, y = log2FC, colour = plate_hit)) +
   geom_point(alpha = 0.7, size = 2) +
   geom_smooth(method = "lm", se = FALSE, colour = "grey40", linetype = "dashed") +
-  facet_wrap(~condition) +
   labs(x = "Published plate assay: log2(effect size), Sen2 (vs. IPTG-low)",
-       y = "This screen: log2FC (toxin+library vs. library-only, matched IPTG)",
+       y = "This screen: log2FC (toxin+library vs. library-only)",
        title = "This screen vs. the published plate-based assay",
        colour = "Plate-assay hit call") +
   theme_minimal()
 
 comparison %>%
-  group_by(condition) %>%
   summarise(
     pearson_r         = cor(log2FC, plate_log2_efsize, use = "complete.obs"),
-    n_binders_matched = n(),
-    .groups = "drop"
+    n_binders_matched = n()
   )
 ```
 
@@ -409,11 +443,11 @@ write_csv(comparison, "../results/plate_assay_comparison.csv")
 ```
 
 A positive correlation here is reassuring, but don't over-read a weak one:
-this screen's baseline (library-only, matched IPTG) and the plate assay's
-(IPTG-low, GFP-corrected) aren't quite the same comparison, both assays have
-their own noise, and a binder missing from `plate_reference` above just
-wasn't in that dataset (check `n_binders_matched` against the number of
-viable binders from Section 2 to see how many actually got compared).
+this screen's baseline (library-only) and the plate assay's (IPTG-low,
+GFP-corrected) aren't quite the same comparison, both assays have their own
+noise, and a binder missing from `plate_reference` above just wasn't in
+that dataset (check `n_binders_matched` against the number of viable binders
+from Section 2 to see how many actually got compared).
 
 ## Where to go from here
 
@@ -423,9 +457,6 @@ viable binders from Section 2 to see how many actually got compared).
   same pool, not just this analysis, and a better-normalised pool (e.g.
   qPCR-checked equimolar pooling before transformation) would fix it at the
   source rather than needing to be corrected for downstream every time.
-* Consider also looking at the 0.1 mM vs 1 mM IPTG comparison directly - a
-  true binder should show a dose response (more enrichment at higher
-  induction).
 * No GFP (or other neutral overexpression) control is included in this
   sequencing-based run. Matching the IPTG level in Section 5 removes most of
   the overexpression-burden confound, but a real GFP control would remove it

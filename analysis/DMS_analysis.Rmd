@@ -18,11 +18,10 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.width =
 We designed 88 candidate binders against the RcaT toxin. Cells carrying the
 pooled binder library were grown under 6 conditions (no inducer, toxin-only,
 library-only at two IPTG levels, and toxin+library at two IPTG levels), one
-sample per condition (no biological replicates - see the note below). RcaT
-kills the cell unless it's bound/inhibited, so **a binder's relative read
-count after selection is a proxy for how well it protects the cell** - good
-binders get relatively enriched when both the toxin and the binder are
-induced together.
+sample per condition. RcaT kills the cell unless it's bound/inhibited, so
+**a binder's relative read count after selection is a proxy for how well it
+protects the cell** - good binders get relatively enriched when both the
+toxin and the binder are induced together.
 
 This mirrors the lab's existing plate-based version of the same assay, and
 uses the same three roles for the 6 conditions:
@@ -41,13 +40,6 @@ uses the same three roles for the 6 conditions:
   should mostly cancel out - what's left over is specifically the effect of
   adding the toxin on top of an already-expressed binder (see Section 5).
 
-**No replicates**: this run has a single sample per condition. Every value
-below is a one-off point estimate, not an average of replicates - there's no
-A-vs-B consistency check to lean on, and no count-based statistical test
-(DESeq2 and similar tools need at least 2 replicates per condition to
-estimate dispersion, so none is used here). Section 6's low-read-count flag
-is the main safeguard against over-trusting a noisy point estimate.
-
 Steps below:
 
 1. Load the counts table produced by `scripts/count_reads_per_binder.py`
@@ -59,8 +51,7 @@ Steps below:
 4. Innate toxicity: library-only vs. no-inducer, as context only.
 5. The actual question: toxin+library vs. library-only, at matched IPTG
    levels.
-6. Final ranked hit table, flagging binders with too little read depth to
-   trust regardless of what their point estimate says.
+6. Final ranked hit table.
 7. Compare against the collaborator's published plate-based screen of the
    same binders (Sen2 retron), as an independent sanity check.
 
@@ -172,7 +163,7 @@ and `toxin_only`/`toxin_plus_library` (after) about equally; if so, it's a
 starting-pool problem, not a growth-advantage-under-treatment one. Either
 way, it means most of the panel is read-starved and any single-point log2FC
 for them will be dominated by sampling noise - keep this in mind in
-Section 5 and the low-read-count flag in Section 6.
+Section 5.
 
 ### Viability filter: drop binders that don't survive no-inducer selection
 
@@ -329,33 +320,11 @@ its own is less convincing) and against the 0.1 mM vs. 1 mM dose response
 (a true binder should show *more* protection at higher induction; a burden
 artifact generally doesn't).
 
-**With a single sample per condition**, every value above is a one-off point
-estimate - there's no replicate to check it against, and no count-based
-statistical test (DESeq2 and similar tools need at least 2 replicates per
-condition) to give it a proper uncertainty estimate. Section 6's
-low-read-count flag is the main safeguard against over-trusting a noisy
-point estimate; it doesn't replace having a second replicate.
-
 ## 6. Final ranked hit table
 
-Binders with too little read depth to trust are flagged rather than
-dropped - `low_count` binders can still show a big log2FC, but Section 2's
-library-complexity check means that's exactly the group most likely to be
-sampling noise, so treat them with real caution regardless of how they rank.
-
 ```{r final-hits}
-low_count_threshold <- 20  # flag (don't exclude) binders averaging fewer reads than this across the compared conditions - tune by eye against Section 2
-
-raw_mean_count <- counts_long %>%
-  filter(condition %in% c("library_only_0.1mM", "library_only_1mM",
-                           "toxin_plus_library_0.1mM", "toxin_plus_library_1mM")) %>%
-  group_by(binder_id) %>%
-  summarise(baseMean = mean(count), .groups = "drop")
-
 hit_results <- key_comparison %>%
-  left_join(raw_mean_count, by = "binder_id") %>%
-  mutate(low_count = baseMean < low_count_threshold) %>%
-  select(binder_id, condition, log2FC, baseMean, low_count) %>%
+  select(binder_id, condition, log2FC) %>%
   arrange(condition, desc(log2FC))
 
 hit_results
@@ -365,10 +334,9 @@ hit_results
 hit_results %>%
   filter(condition == "toxin_plus_library_1mM") %>%
   slice_max(log2FC, n = 20) %>%
-  ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC, fill = low_count)) +
-  geom_col() +
+  ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC)) +
+  geom_col(fill = "steelblue") +
   coord_flip() +
-  scale_fill_manual(values = c(`FALSE` = "steelblue", `TRUE` = "grey60"), name = "low read count") +
   labs(x = "Binder", y = "log2FC vs. library-only (1 mM IPTG)",
        title = "Top 20 RcaT binders by protection") +
   theme_minimal()
@@ -417,27 +385,21 @@ comparison <- hit_results %>%
   filter(!is.na(plate_log2_efsize))
 
 comparison %>%
-  ggplot(aes(x = plate_log2_efsize, y = log2FC, colour = plate_hit, shape = low_count)) +
+  ggplot(aes(x = plate_log2_efsize, y = log2FC, colour = plate_hit)) +
   geom_point(alpha = 0.7, size = 2) +
   geom_smooth(method = "lm", se = FALSE, colour = "grey40", linetype = "dashed") +
   facet_wrap(~condition) +
   labs(x = "Published plate assay: log2(effect size), Sen2 (vs. IPTG-low)",
        y = "This screen: log2FC (toxin+library vs. library-only, matched IPTG)",
        title = "This screen vs. the published plate-based assay",
-       colour = "Plate-assay hit call", shape = "Low read count") +
+       colour = "Plate-assay hit call") +
   theme_minimal()
 
-# Does excluding the low-read-count binders (flagged in Section 6) change
-# the picture? If most of the disagreement comes from binders Section 2
-# already told us are read-starved, that's the library-complexity problem
-# showing up here too, not a real disagreement between the two assays.
 comparison %>%
   group_by(condition) %>%
   summarise(
-    pearson_r_all             = cor(log2FC, plate_log2_efsize, use = "complete.obs"),
-    pearson_r_excl_low_count  = cor(log2FC[!low_count], plate_log2_efsize[!low_count], use = "complete.obs"),
-    n_binders_matched         = n(),
-    n_excl_low_count          = sum(!low_count),
+    pearson_r         = cor(log2FC, plate_log2_efsize, use = "complete.obs"),
+    n_binders_matched = n(),
     .groups = "drop"
   )
 ```
@@ -469,7 +431,3 @@ viable binders from Section 2 to see how many actually got compared).
   the overexpression-burden confound, but a real GFP control would remove it
   more rigorously and would bring this in line with the plate-based assay's
   full method.
-* If a second replicate ever becomes available, re-running with both would
-  let you add a genuine A-vs-B consistency check and a count-based test
-  (DESeq2 or similar) that gives each binder a real uncertainty estimate
-  instead of relying on the low-read-count flag alone.

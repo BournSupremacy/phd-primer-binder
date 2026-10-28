@@ -47,10 +47,10 @@ run_pipeline.sh                    convenience wrapper that runs 00->01->02 in o
 slurm/submit_pipeline.sh           submits the same 3 scripts via sbatch, chained with job dependencies - see "Running on a SLURM cluster"
 environment.yml                    conda env for the demux/QC/alignment tools (fallback if your cluster has no modules for them)
 analysis/
-  DMS_analysis.Rmd                 the actual DMS-style analysis (normalisation, log2FC, low-count flagging, hit table)
-  DMS_analysis_expression_batches.Rmd  variant that splits the panel into high-/low-expressing batches before
-                                        normalising, so a handful of dominant binders can't compositionally
-                                        drown out the comparison for everyone else - see its own Section 0
+  DMS_analysis.Rmd                 the actual DMS-style analysis (normalisation, log2FC, hit table)
+  DMS_analysis_expression_batches.Rmd  variant that excludes the dominant high-expressing binders before
+                                        normalising, so they can't compositionally drown out the comparison
+                                        for everyone else - see its own Section 0
 results/                           binder_counts.tsv and everything the R notebook produces (gitignored except final CSV)
 ```
 
@@ -163,9 +163,7 @@ these:
 This mirrors the lab's existing plate-based version of the same assay, with
 `no_inducer` used as a QC/viability step rather than a normalisation input.
 There's a single sample per condition (no biological replicates), so every
-log2FC below is a one-off point estimate - there's no replicate-consistency
-check, and no count-based statistical test like DESeq2 (those need at least
-2 replicates per condition to estimate dispersion, so none is used here).
+log2FC below is a one-off point estimate.
 
 1. Load `results/binder_counts.tsv` (long format: sample, binder, count) +
    `config/samples.tsv` metadata; reshape into a binder x sample table.
@@ -192,10 +190,7 @@ check, and no count-based statistical test like DESeq2 (those need at least
    true GFP/neutral-overexpression control, which the plate-based assay uses
    and this sequencing-based run doesn't have - see the caveat in the
    notebook.)
-6. Final ranked hit table: binders averaging too few reads across the
-   compared conditions are flagged (not excluded) as `low_count`, since a
-   single point estimate backed by only a handful of reads is mostly
-   sampling noise - written to `results/final_binder_ranking.csv`.
+6. Final ranked hit table, written to `results/final_binder_ranking.csv`.
 7. Comparison to the collaborator's published plate-based screen of the same
    binders (`data/plate_assay_reference_hits.tsv`, filtered to the Sen2
    retron) - a rough sanity check on direction/ranking, not a strict

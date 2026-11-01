@@ -15,29 +15,17 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.width =
 
 ## 0. What this notebook does differently
 
-This is a variant of `DMS_analysis.Rmd` (see that notebook for the full
-walkthrough of the experiment, the conditions, and the basic logic - it's
-not repeated here). The difference is in how it handles something that
-notebook's library-complexity check (Section 2) turned up: in this pool, a
-handful of binders dominate the read counts in every sample, while most of
-the other ~80 are read-starved by comparison. Because every binder's count
-is really a *share* of a fixed sequencing total, those dominant binders
-distort the normalisation for everyone else - even a binder whose own
-abundance didn't really change can look enriched or depleted just because
-the dominant clones' share shifted around it.
+A variant of `DMS_analysis.Rmd` (see that notebook for the full walkthrough
+- not repeated here). Section 2's library-complexity check there found a
+handful of binders dominating the read counts in every sample, squeezing
+everyone else. Since every binder's count is a *share* of a fixed total, a
+binder's apparent frequency can shift just because the dominant clones'
+share shifted, even if nothing real changed for that binder.
 
 **The fix here**: split the panel into a high-expressing batch and a
-low-expressing batch *before* any normalisation or hit-calling, and run the
-entire comparison separately within each batch. Low-expressing binders are
-never thrown out - they're just compared only against other binders at a
-similar abundance, instead of being compositionally squeezed by a few
-dominant clones that have nothing to do with them.
-
-**What this does and doesn't fix**: splitting removes the dominant clones
-from the low-expressing batch's own normalisation, which is a real
-distortion. It does *not* manufacture extra sequencing depth - a binder with
-genuinely few reads still has genuinely few reads. Splitting fixes a
-normalisation bias, not a sequencing-depth limit.
+low-expressing batch *before* normalising, and run the comparison
+separately within each - low-expressing binders are never thrown out, just
+compared only against others at a similar abundance.
 
 ```{r libraries}
 library(tidyverse)
@@ -55,9 +43,6 @@ counts_long <- counts_long %>%
   left_join(samples %>% select(sample_id, condition, ara_pct, iptg_mM),
             by = "sample_id")
 
-# The 1 mM IPTG conditions (library_only_1mM, toxin_plus_library_1mM) are
-# sequenced but aren't part of this analysis - read in above like everything
-# else, then dropped here so nothing downstream ever sees them.
 counts_long <- counts_long %>%
   filter(!condition %in% c("library_only_1mM", "toxin_plus_library_1mM"))
 
@@ -65,9 +50,6 @@ head(counts_long)
 ```
 
 ## 2. QC: sequencing depth, library complexity, viability
-
-Same QC as `DMS_analysis.Rmd` - included here so the batch split below has
-a clean, already-filtered starting point.
 
 ```{r qc-depth}
 depth <- counts_long %>%
@@ -107,9 +89,8 @@ complexity %>%
   theme_minimal()
 ```
 
-This is exactly the pattern that motivates the batch split below - if it's
-flat/gradual here (no dominant clones), splitting into batches won't change
-much and you may as well use the unsplit `DMS_analysis.Rmd` instead.
+Flat here? Splitting into batches won't change much - `DMS_analysis.Rmd`
+alone would do.
 
 ### Viability filter: drop binders that don't survive no-inducer selection
 
@@ -134,21 +115,16 @@ dead_binders <- no_inducer_counts %>%
   pull(binder_id)
 
 if (length(dead_binders) > 0) {
-  message(length(dead_binders), " binder(s) dropped as non-viable (no_inducer count < ",
-          min_no_inducer_reads, "): ", paste(dead_binders, collapse = ", "))
+  cat(length(dead_binders), " binder(s) dropped as non-viable (no_inducer count < ",
+      min_no_inducer_reads, "): ", paste(dead_binders, collapse = ", "), "\n", sep = "")
 } else {
-  message("No binders dropped - all binders survive no-inducer selection above threshold.")
+  cat("No binders dropped - all binders survive no-inducer selection above threshold.\n")
 }
 
 counts_long <- counts_long %>% filter(!(binder_id %in% dead_binders))
 ```
 
 ### Low-count filter: drop binders too thinly covered overall
-
-The viability filter above only looks at `no_inducer`. A binder can still
-pass that and be backed by very few reads elsewhere - drop any binder whose
-mean read count across all the samples used here falls below a minimum
-threshold.
 
 ```{r low-count-filter}
 min_mean_count <- 5  # tune by eye against the histogram below
@@ -171,10 +147,10 @@ low_count_binders <- mean_counts %>%
   pull(binder_id)
 
 if (length(low_count_binders) > 0) {
-  message(length(low_count_binders), " binder(s) dropped for too few reads overall (mean count < ",
-          min_mean_count, "): ", paste(low_count_binders, collapse = ", "))
+  cat(length(low_count_binders), " binder(s) dropped for too few reads overall (mean count < ",
+      min_mean_count, "): ", paste(low_count_binders, collapse = ", "), "\n", sep = "")
 } else {
-  message("No binders dropped - all binders average at least ", min_mean_count, " reads across all samples.")
+  cat("No binders dropped - all binders average at least ", min_mean_count, " reads across all samples.\n", sep = "")
 }
 
 counts_long <- counts_long %>% filter(!(binder_id %in% low_count_binders))
@@ -182,12 +158,8 @@ counts_long <- counts_long %>% filter(!(binder_id %in% low_count_binders))
 
 ### Splitting into high- and low-expressing batches
 
-Rank binders by their overall abundance (mean raw read count across *all*
-samples and conditions - not just one condition, since Section 2's library
-complexity check showed the same handful of binders dominate every
-condition about equally). Binders at or above the threshold go in the
-high-expressing batch; everyone else goes in the low-expressing batch.
-Nothing is excluded here - every viable binder lands in exactly one batch.
+Rank binders by overall abundance (mean count across all samples). At or
+above the threshold -> high-expressing batch; everyone else -> low.
 
 ```{r expression-batch-split}
 high_expr_threshold <- 1000  # mean read count across all samples; tune by eye against the histogram below
@@ -212,11 +184,11 @@ expr_batch <- overall_abundance %>%
 high_expr_binders <- expr_batch %>% filter(batch == "high") %>% pull(binder_id)
 low_expr_binders  <- expr_batch %>% filter(batch == "low") %>% pull(binder_id)
 
-message(length(high_expr_binders), " binder(s) assigned to the high-expressing batch, ",
-        length(low_expr_binders), " to the low-expressing batch.")
+cat(length(high_expr_binders), " binder(s) assigned to the high-expressing batch, ",
+    length(low_expr_binders), " to the low-expressing batch.\n", sep = "")
 
-# Sanity check: the high batch should hold most of the READS; the low batch
-# should hold most of the BINDERS. That mismatch is the whole reason to split.
+# The high batch should hold most of the READS; the low batch most of the
+# BINDERS. That mismatch is the whole reason to split.
 counts_long %>%
   left_join(expr_batch %>% select(binder_id, batch), by = "binder_id") %>%
   group_by(batch) %>%
@@ -226,19 +198,19 @@ counts_long %>%
 
 ## 3. The per-batch pipeline
 
-Everything from here on (normalisation, innate toxicity, the key comparison,
-the final hit table) is identical in logic to `DMS_analysis.Rmd` Sections
-3-6 - it's written once as a function and run twice (Sections 4 and 5), so
-the two batches get exactly the same treatment and nothing diverges by
-accident. The key point: every `group_by(sample_id)` normalisation step only
-ever sees the binders in *that* batch - a low-expressing binder's frequency
-is computed against the low batch's own total, never diluted by the high
-batch's reads.
+Fitness here uses `DMS_analysis.Rmd`'s reference-binder approach - a
+ratio-of-ratios relative to one binder you're confident isn't a hit, rather
+than a plain frequency ratio (see that notebook's Section 5 for the
+formula). Written once as a function, run once per batch with its own
+reference (each batch needs a reference from *within* that batch).
+
+Does the batch split still matter once fitness is computed this way, rather
+than as a frequency? What is and isn't a frequency-only problem here?
 
 ```{r batch-pipeline-functions}
 pseudocount <- 1
 
-run_batch_pipeline <- function(counts_batch) {
+run_batch_pipeline <- function(counts_batch, reference_binder) {
   counts_norm <- counts_batch %>%
     group_by(sample_id) %>%
     mutate(
@@ -263,44 +235,45 @@ run_batch_pipeline <- function(counts_batch) {
     ggplot(aes(x = binder_id, y = log2FC)) +
     geom_col() +
     labs(x = "Binder", y = "log2FC vs. no_inducer",
-         title = "Innate toxicity of overexpression (no toxin present)",
-         subtitle = "Reference only - not used in hit-calling") +
+         title = "Innate toxicity of overexpression (no toxin present)") +
     theme_minimal() +
     theme(axis.text.x = element_blank())
 
-  # The actual comparison: toxin+library vs. library-only, both at 0.1 mM
-  # IPTG. Both arms have the binder induced at the same level, so each
-  # binder's own overexpression cost is present on both sides of the ratio
-  # and should mostly cancel out - what's left is mainly the effect of
-  # adding the toxin on top of an already-expressed binder.
-  library_only_freq <- condition_freq %>%
-    filter(condition == "library_only_0.1mM") %>%
-    select(binder_id, library_only_freq = freq)
+  reference_counts <- counts_batch %>%
+    filter(binder_id == reference_binder, condition %in% c("library_only_0.1mM", "toxin_plus_library_0.1mM")) %>%
+    select(condition, count) %>%
+    deframe()
+  ref_input    <- reference_counts[["library_only_0.1mM"]]
+  ref_selected <- reference_counts[["toxin_plus_library_0.1mM"]]
 
-  key_comparison <- condition_freq %>%
-    filter(condition == "toxin_plus_library_0.1mM") %>%
-    left_join(library_only_freq, by = "binder_id") %>%
-    mutate(log2FC = log2(freq / library_only_freq))
+  key_comparison <- counts_batch %>%
+    filter(condition %in% c("library_only_0.1mM", "toxin_plus_library_0.1mM")) %>%
+    select(binder_id, condition, count) %>%
+    pivot_wider(names_from = condition, values_from = count) %>%
+    rename(input = library_only_0.1mM, selected = toxin_plus_library_0.1mM) %>%
+    mutate(
+      fitness = log2((selected + pseudocount) / (input + pseudocount) /
+                     ((ref_selected + pseudocount) / (ref_input + pseudocount)))
+    )
 
   p_key_comparison <- key_comparison %>%
-    ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC)) +
+    ggplot(aes(x = reorder(binder_id, fitness), y = fitness)) +
     geom_col(fill = "steelblue") +
     coord_flip() +
-    labs(x = "Binder", y = "log2FC vs. library-only",
-         title = "Enrichment when co-induced with toxin (this batch only)",
-         subtitle = "Positive = binder does better under toxin challenge than its own baseline without toxin") +
+    labs(x = "Binder", y = "Fitness (relative to reference)",
+         title = "Fitness: toxin+library vs. library-only (this batch only)") +
     theme_minimal()
 
   hit_results <- key_comparison %>%
-    select(binder_id, condition, log2FC) %>%
-    arrange(desc(log2FC))
+    select(binder_id, fitness) %>%
+    arrange(desc(fitness))
 
   p_final <- hit_results %>%
-    slice_max(log2FC, n = 20) %>%
-    ggplot(aes(x = reorder(binder_id, log2FC), y = log2FC)) +
+    slice_max(fitness, n = 20) %>%
+    ggplot(aes(x = reorder(binder_id, fitness), y = fitness)) +
     geom_col(fill = "steelblue") +
     coord_flip() +
-    labs(x = "Binder", y = "log2FC vs. library-only",
+    labs(x = "Binder", y = "Fitness (relative to reference)",
          title = "Top binders by protection (this batch only)") +
     theme_minimal()
 
@@ -326,18 +299,18 @@ compare_to_plate <- function(hit_results, plate_reference, batch_label) {
     filter(!is.na(plate_log2_efsize))
 
   p <- comparison %>%
-    ggplot(aes(x = plate_log2_efsize, y = log2FC, colour = plate_hit)) +
+    ggplot(aes(x = plate_log2_efsize, y = fitness, colour = plate_hit)) +
     geom_point(alpha = 0.7, size = 2) +
     geom_smooth(method = "lm", se = FALSE, colour = "grey40", linetype = "dashed") +
     labs(x = "Published plate assay: log2(effect size), Sen2 (vs. IPTG-low)",
-         y = paste0(batch_label, "-batch log2FC (toxin+library vs. library-only)"),
+         y = paste0(batch_label, "-batch fitness (toxin+library vs. library-only)"),
          title = paste0("This screen (", batch_label, " batch) vs. the published plate-based assay"),
          colour = "Plate-assay hit call") +
     theme_minimal()
 
   cor_summary <- comparison %>%
     summarise(
-      pearson_r         = cor(log2FC, plate_log2_efsize, use = "complete.obs"),
+      pearson_r         = cor(fitness, plate_log2_efsize, use = "complete.obs"),
       n_binders_matched = n()
     ) %>%
     mutate(batch = batch_label, .before = 1)
@@ -350,7 +323,8 @@ compare_to_plate <- function(hit_results, plate_reference, batch_label) {
 
 ```{r high-batch-run}
 high_batch_counts <- counts_long %>% filter(binder_id %in% high_expr_binders)
-high <- run_batch_pipeline(high_batch_counts)
+high_reference_binder <- "rcat-binder-cpx-50-nr2-run_1_result_5"  # <- pick your own from this batch
+high <- run_batch_pipeline(high_batch_counts, high_reference_binder)
 ```
 
 ```{r high-innate-toxicity}
@@ -361,9 +335,8 @@ high$p_innate_toxicity
 high$p_key_comparison
 ```
 
-**Caution**: this batch is, by construction, a small handful of binders -
-any correlation computed from it below is far less reliable than it is for
-the low-expressing batch, just from having so few points.
+This batch is, by construction, a small handful of binders - how much would
+you trust a correlation computed from it, compared to the low batch below?
 
 ```{r high-final-hits}
 high$hit_results
@@ -379,12 +352,10 @@ write_csv(high$hit_results, "../results/final_binder_ranking_high.csv")
 
 ## 5. Low-expressing batch
 
-This is the batch that was getting compositionally squeezed in the unsplit
-analysis - here it's normalised entirely on its own terms.
-
 ```{r low-batch-run}
 low_batch_counts <- counts_long %>% filter(binder_id %in% low_expr_binders)
-low <- run_batch_pipeline(low_batch_counts)
+low_reference_binder <- "result_50aa_1_10"  # <- pick your own from this batch
+low <- run_batch_pipeline(low_batch_counts, low_reference_binder)
 ```
 
 ```{r low-innate-toxicity}
@@ -409,10 +380,8 @@ write_csv(low$hit_results, "../results/final_binder_ranking_low.csv")
 
 ## 6. Comparing each batch to the published plate-based screen (Sen2 retron)
 
-Same reference data and same caveats as `DMS_analysis.Rmd` Section 7 (their
-effect size uses an IPTG-low baseline and a GFP correction we don't have -
-this is a rough sanity check, not a strict validation) - run once per batch,
-each batch getting its own separate plot rather than one combined chart.
+Same reference data and caveats as `DMS_analysis.Rmd` Section 7 - run once
+per batch.
 
 ```{r load-plate-reference}
 plate_reference <- read_tsv("../data/plate_assay_reference_hits.tsv", show_col_types = FALSE) %>%
@@ -438,29 +407,22 @@ write_csv(cmp_low$comparison, "../results/plate_assay_comparison_low.csv")
 ## 7. Did splitting help?
 
 Compare the table above against `DMS_analysis.Rmd`'s unsplit
-`plate_assay_comparison.csv` correlation. What to look for:
+`plate_assay_comparison.csv` correlation.
 
-- If the low-expressing batch's correlation with the plate assay is
-  noticeably better here than in the unsplit notebook, that's evidence the
-  dominant clones really were distorting the comparison for everyone else -
-  exactly the problem this notebook exists to fix.
-- If it's about the same, the low-expressing binders' own read depth (not
-  the dominant clones' compositional pull) is the limiting factor - splitting
-  can't fix a binder that was only ever backed by a handful of reads to
-  begin with.
-- The high-expressing batch's correlation is based on very few binders
-  (see the caution in Section 4) - a single outlier among 5-10 points can
-  swing that number a lot, so don't read much into it alone.
+- Better here for the low-expressing batch? That points at the dominant
+  clones distorting things for everyone else in the unsplit version.
+- About the same? Read depth, not compositional squeeze, is the limit -
+  something splitting can't fix.
+- The high-expressing batch's correlation rests on very few points - how
+  much would one outlier change it?
 
 ## Where to go from here
 
-* If most binders land in one batch and almost none in the other, the
-  `high_expr_threshold` in Section 2 is in the wrong place for this
-  dataset - move it and re-knit; the histogram there is the thing to look
-  at, not a fixed number.
-* This splits on overall abundance once, globally. A binder that's
-  middling in one condition but dominant in another would still be
-  assigned to a single batch for every comparison - if that matters for
-  your data, consider a per-condition rather than per-binder split.
-* Everything in `DMS_analysis.Rmd`'s own "Where to go from here" still
-  applies here too (the missing GFP control).
+* If almost everything lands in one batch, `high_expr_threshold` in
+  Section 2 needs moving - use the histogram, not a fixed number.
+* This splits on overall abundance once, globally - a binder that's
+  middling in one condition but dominant in another still gets assigned to
+  a single batch for everything. Would a per-condition split change your
+  answer?
+* Everything in `DMS_analysis.Rmd`'s own "Where to go from here" applies
+  here too.

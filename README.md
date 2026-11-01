@@ -192,13 +192,12 @@ log2FC below is a one-off point estimate.
    - how costly is overexpressing this binder on its own, with no toxin
    present? Reported for interpretation, not used to correct the main
    result.
-5. **The actual answer**: log2FC of toxin+library vs. **library-only** (both
-   at 0.1 mM IPTG) - both arms have the binder induced at the same level, so
-   each binder's own overexpression cost is present on both sides and should
-   mostly cancel out, leaving mainly the effect of adding the toxin on top
-   of an already-expressed binder. (Not a full substitute for a true
-   GFP/neutral-overexpression control, which the plate-based assay uses and
-   this sequencing-based run doesn't have - see the caveat in the notebook.)
+5. **The actual answer**: a DiMSum-style fitness score for toxin+library vs.
+   **library-only** (both at 0.1 mM IPTG) - a ratio-of-ratios relative to
+   one reference binder (chosen by inspecting the QC plots; see the
+   notebook) rather than a plain frequency ratio, so that whatever shifts
+   every binder's apparent abundance equally - like the library-complexity
+   skew in step 2 - cancels out.
 6. Final ranked hit table, written to `results/final_binder_ranking.csv`.
 7. Comparison to the collaborator's published plate-based screen of the same
    binders (`data/plate_assay_reference_hits.tsv`, filtered to the Sen2

@@ -201,16 +201,25 @@ counts_long %>%
 Fitness here uses `DMS_analysis.Rmd`'s reference-binder approach - a
 ratio-of-ratios relative to one binder you're confident isn't a hit, rather
 than a plain frequency ratio (see that notebook's Section 5 for the
-formula). Written once as a function, run once per batch with its own
-reference (each batch needs a reference from *within* that batch).
+formula). One reference, picked once, used for both batches: the formula is
+built from raw counts with no per-sample or per-batch total in it anywhere,
+so it doesn't matter which batch the reference itself happens to land in.
 
 Does the batch split still matter once fitness is computed this way, rather
 than as a frequency? What is and isn't a frequency-only problem here?
 
 ```{r batch-pipeline-functions}
 pseudocount <- 1
+reference_binder <- "result_50aa_1_10"  # <- pick your own; same one for both batches
 
-run_batch_pipeline <- function(counts_batch, reference_binder) {
+reference_counts <- counts_long %>%
+  filter(binder_id == reference_binder, condition %in% c("library_only_0.1mM", "toxin_plus_library_0.1mM")) %>%
+  select(condition, count) %>%
+  deframe()
+ref_input    <- reference_counts[["library_only_0.1mM"]]
+ref_selected <- reference_counts[["toxin_plus_library_0.1mM"]]
+
+run_batch_pipeline <- function(counts_batch) {
   counts_norm <- counts_batch %>%
     group_by(sample_id) %>%
     mutate(
@@ -238,13 +247,6 @@ run_batch_pipeline <- function(counts_batch, reference_binder) {
          title = "Innate toxicity of overexpression (no toxin present)") +
     theme_minimal() +
     theme(axis.text.x = element_blank())
-
-  reference_counts <- counts_batch %>%
-    filter(binder_id == reference_binder, condition %in% c("library_only_0.1mM", "toxin_plus_library_0.1mM")) %>%
-    select(condition, count) %>%
-    deframe()
-  ref_input    <- reference_counts[["library_only_0.1mM"]]
-  ref_selected <- reference_counts[["toxin_plus_library_0.1mM"]]
 
   key_comparison <- counts_batch %>%
     filter(condition %in% c("library_only_0.1mM", "toxin_plus_library_0.1mM")) %>%
@@ -323,8 +325,7 @@ compare_to_plate <- function(hit_results, plate_reference, batch_label) {
 
 ```{r high-batch-run}
 high_batch_counts <- counts_long %>% filter(binder_id %in% high_expr_binders)
-high_reference_binder <- "rcat-binder-cpx-50-nr2-run_1_result_5"  # <- pick your own from this batch
-high <- run_batch_pipeline(high_batch_counts, high_reference_binder)
+high <- run_batch_pipeline(high_batch_counts)
 ```
 
 ```{r high-innate-toxicity}
@@ -354,8 +355,7 @@ write_csv(high$hit_results, "../results/final_binder_ranking_high.csv")
 
 ```{r low-batch-run}
 low_batch_counts <- counts_long %>% filter(binder_id %in% low_expr_binders)
-low_reference_binder <- "result_50aa_1_10"  # <- pick your own from this batch
-low <- run_batch_pipeline(low_batch_counts, low_reference_binder)
+low <- run_batch_pipeline(low_batch_counts)
 ```
 
 ```{r low-innate-toxicity}

@@ -4,25 +4,18 @@ RunName,phd_primer_RcaT_binder_screen
 InstrumentPlatform,MiSeq
 
 [Reads]
-Read1Cycles,150
-Read2Cycles,150
+Read1Cycles,50
+Read2Cycles,50
 
 [BCLConvert_Settings]
-AdapterRead1,CTGTCTCTTATACACATCT
-AdapterRead2,CTGTCTCTTATACACATCT
-BarcodeMismatchesIndex1,1
+AdapterRead1,AATGATACGGCGACCACCGAGATCTACAC
+AdapterRead2,CAAGCAGAAGACGGCATACGAGAT
+OverrideCycles,Y50;I10;N10;Y50
 
 [BCLConvert_Data]
 Sample_ID,index,index2
 noInducer_A,NNNNNNNN,NNNNNNNN
-noInducer_B,NNNNNNNN,NNNNNNNN
 toxinOnly_A,NNNNNNNN,NNNNNNNN
-toxinOnly_B,NNNNNNNN,NNNNNNNN
 libOnly_0_1mM_A,NNNNNNNN,NNNNNNNN
-libOnly_0_1mM_B,NNNNNNNN,NNNNNNNN
-libOnly_1mM_A,NNNNNNNN,NNNNNNNN
-libOnly_1mM_B,NNNNNNNN,NNNNNNNN
 toxLib_0_1mM_A,NNNNNNNN,NNNNNNNN
-toxLib_0_1mM_B,NNNNNNNN,NNNNNNNN
-toxLib_1mM_A,NNNNNNNN,NNNNNNNN
-toxLib_1mM_B,NNNNNNNN,NNNNNNNN
+plasmid_lib,NNNNNNNN,NNNNNNNN

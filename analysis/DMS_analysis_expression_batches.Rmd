@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.width =
 ## 0. What this notebook does differently
 
 A variant of `DMS_analysis.Rmd` (see that notebook for the full walkthrough
-- not repeated here). Section 2's library-complexity check there found a
+- not repeated here). Section 3's library-complexity check there found a
 handful of binders dominating the read counts in every sample, squeezing
 everyone else. Since every binder's count is a *share* of a fixed total, a
 binder's apparent frequency can shift just because the dominant clones'
@@ -36,20 +36,52 @@ library(scales)
 
 ```{r load-data}
 counts_long <- read_tsv("../results/binder_counts.tsv", show_col_types = FALSE)
-samples     <- read_tsv("../config/samples.tsv", show_col_types = FALSE)
+samples     <- read_tsv("../config/samples_template.tsv", show_col_types = FALSE)
 
 counts_long <- counts_long %>%
   complete(binder_id, sample_id = samples$sample_id, fill = list(count = 0)) %>%
   left_join(samples %>% select(sample_id, condition, ara_pct, iptg_mM),
             by = "sample_id")
 
-counts_long <- counts_long %>%
-  filter(!condition %in% c("library_only_1mM", "toxin_plus_library_1mM"))
-
 head(counts_long)
 ```
 
-## 2. QC: sequencing depth, library complexity, viability
+One row per binder, one column per sample, once you reshape it - does this
+match `config/samples_template.tsv`?
+
+## 2. Library representation: plasmid pool vs. after growth
+
+`plasmid_library` is the pooled plasmid prep itself - no transformation, no
+growth, no selection at all. Comparing it to `no_inducer` (grown, plain
+antibiotic selection, nothing induced) tells you whether any skew you see
+later already existed in the tube, or only shows up once cells start
+growing.
+
+```{r plasmid-library-check}
+plasmid_vs_no_inducer <- counts_long %>%
+  filter(condition %in% c("plasmid_library", "no_inducer")) %>%
+  group_by(sample_id) %>%
+  mutate(freq = count / sum(count)) %>%
+  ungroup() %>%
+  select(binder_id, condition, freq) %>%
+  pivot_wider(names_from = condition, values_from = freq)
+
+plasmid_vs_no_inducer %>%
+  ggplot(aes(x = plasmid_library, y = no_inducer)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey40") +
+  scale_x_log10(labels = label_number()) +
+  scale_y_log10(labels = label_number()) +
+  labs(x = "Relative frequency: plasmid_library", y = "Relative frequency: no_inducer",
+       title = "Library representation: raw plasmid prep vs. after growth") +
+  theme_minimal()
+```
+
+Does this look like fair representation, or does the library structure
+already look skewed before a single cell was even grown? Worth an answer
+before deciding the batch split below is even needed.
+
+## 3. QC: sequencing depth, library complexity, viability
 
 ```{r qc-depth}
 depth <- counts_long %>%
@@ -67,6 +99,9 @@ depth %>%
 ```{r qc-table}
 depth
 ```
+
+A sample with much lower depth than the others deserves a second look - what
+would you check?
 
 ### Library complexity: how evenly is the pool represented?
 
@@ -130,6 +165,7 @@ counts_long <- counts_long %>% filter(!(binder_id %in% dead_binders))
 min_mean_count <- 5  # tune by eye against the histogram below
 
 mean_counts <- counts_long %>%
+  filter(condition != "plasmid_library") %>%  # not part of the downstream comparison
   group_by(binder_id) %>%
   summarise(mean_count = mean(count), .groups = "drop")
 
@@ -165,6 +201,7 @@ above the threshold -> high-expressing batch; everyone else -> low.
 high_expr_threshold <- 1000  # mean read count across all samples; tune by eye against the histogram below
 
 overall_abundance <- counts_long %>%
+  filter(condition != "plasmid_library") %>%  # classify by dominance in the samples that matter downstream
   group_by(binder_id) %>%
   summarise(mean_count_overall = mean(count), .groups = "drop")
 
@@ -196,11 +233,14 @@ counts_long %>%
   mutate(share_of_reads = total_reads / sum(total_reads))
 ```
 
-## 3. The per-batch pipeline
+Does the high batch look like a small handful of dominant clones, or a more
+gradual spread? How would that change how much you trust the split?
+
+## 4. The per-batch pipeline
 
 Fitness here uses `DMS_analysis.Rmd`'s reference-binder approach - a
 ratio-of-ratios relative to one binder you're confident isn't a hit, rather
-than a plain frequency ratio (see that notebook's Section 5 for the
+than a plain frequency ratio (see that notebook's Section 6 for the
 formula). One reference, picked once, used for both batches: the formula is
 built from raw counts with no per-sample or per-batch total in it anywhere,
 so it doesn't matter which batch the reference itself happens to land in.
@@ -321,7 +361,7 @@ compare_to_plate <- function(hit_results, plate_reference, batch_label) {
 }
 ```
 
-## 4. High-expressing batch
+## 5. High-expressing batch
 
 ```{r high-batch-run}
 high_batch_counts <- counts_long %>% filter(binder_id %in% high_expr_binders)
@@ -351,7 +391,7 @@ high$p_final
 write_csv(high$hit_results, "../results/final_binder_ranking_high.csv")
 ```
 
-## 5. Low-expressing batch
+## 6. Low-expressing batch
 
 ```{r low-batch-run}
 low_batch_counts <- counts_long %>% filter(binder_id %in% low_expr_binders)
@@ -378,9 +418,12 @@ low$p_final
 write_csv(low$hit_results, "../results/final_binder_ranking_low.csv")
 ```
 
-## 6. Comparing each batch to the published plate-based screen (Sen2 retron)
+Compare this plot to the high-expressing batch's - does the shape of the
+distribution look different, and if so, how?
 
-Same reference data and caveats as `DMS_analysis.Rmd` Section 7 - run once
+## 7. Comparing each batch to the published plate-based screen (Sen2 retron)
+
+Same reference data and caveats as `DMS_analysis.Rmd` Section 8 - run once
 per batch.
 
 ```{r load-plate-reference}
@@ -404,7 +447,7 @@ write_csv(cmp_high$comparison, "../results/plate_assay_comparison_high.csv")
 write_csv(cmp_low$comparison, "../results/plate_assay_comparison_low.csv")
 ```
 
-## 7. Did splitting help?
+## 8. Did splitting help?
 
 Compare the table above against `DMS_analysis.Rmd`'s unsplit
 `plate_assay_comparison.csv` correlation.
@@ -419,7 +462,7 @@ Compare the table above against `DMS_analysis.Rmd`'s unsplit
 ## Where to go from here
 
 * If almost everything lands in one batch, `high_expr_threshold` in
-  Section 2 needs moving - use the histogram, not a fixed number.
+  Section 3 needs moving - use the histogram, not a fixed number.
 * This splits on overall abundance once, globally - a binder that's
   middling in one condition but dominant in another still gets assigned to
   a single batch for everything. Would a per-condition split change your

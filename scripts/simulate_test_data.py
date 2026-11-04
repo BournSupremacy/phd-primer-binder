@@ -7,17 +7,22 @@ It creates:
     "binder" sequences of realistic length (300-450bp), a handful of which are
     designated as true strong RcaT binders.
   - data/demux/<sample_id>_R{1,2}.fastq.gz for every sample in
-    config/samples.tsv, with per-binder relative abundances that reflect the
+    config/samples_template.tsv, with per-binder relative abundances that reflect the
     expected biology:
-      * no_inducer / library_only (any IPTG, no toxin): all binders ~uniform
-        (growth isn't toxin-challenged, so binder identity shouldn't matter)
-      * toxin_only (Ara, no IPTG so binder isn't expressed): also ~uniform,
-        close to the no_inducer baseline (nothing rescues without induction)
-      * toxin_plus_library (Ara + IPTG): true binders enriched relative to
-        non-binders, more so at 1 mM than 0.1 mM IPTG
-    plus multinomial sampling noise and a small amount of extra rep-to-rep
-    variability, so the simulated data exercises the QC/consistency steps
-    in analysis/DMS_analysis.Rmd too.
+      * a fixed per-binder "library skew" (a founder/pool-prep effect) applied
+        to every sample equally, including plasmid_library itself, so the
+        dry run has something real to find when comparing plasmid_library
+        against no_inducer
+      * plasmid_library / no_inducer / library_only_0.1mM (no toxin): close to
+        that shared skew, no further enrichment (growth isn't
+        toxin-challenged, so binder identity shouldn't matter beyond the
+        pre-existing skew)
+      * toxin_only (Ara, no IPTG so binder isn't expressed): same as above -
+        nothing rescues without induction
+      * toxin_plus_library_0.1mM (Ara + IPTG): true binders enriched on top of
+        the library skew
+    plus multinomial sampling noise, so the simulated data exercises the
+    QC steps in analysis/DMS_analysis.Rmd too.
 
 This is a teaching aid, not a generative model of real sequencing data -
 reads have no flanking cloning sequence and errors are a simple per-base
@@ -34,10 +39,10 @@ import random
 import numpy as np
 
 BASES = "ACGT"
-SAMPLES_TSV = "config/samples.tsv"
+SAMPLES_TSV = "config/samples_template.tsv"
 DEFAULT_REF = "data/binders.fasta"
 DEMUX_DIR = "data/demux"
-READ_LEN = 150
+READ_LEN = 50
 
 
 def random_seq(length, rng):
@@ -90,17 +95,21 @@ def read_samples_tsv(path):
     return rows
 
 
-def relative_abundance(binder_ids, true_binder_ids, condition, iptg_mM, rng):
-    """Return a probability vector over binder_ids for a given condition."""
-    n = len(binder_ids)
-    base = np.ones(n)
+def relative_abundance(binder_ids, true_binder_ids, condition, library_skew, rng):
+    """Return a probability vector over binder_ids for a given condition.
 
-    is_toxin_plus_library = condition.startswith("toxin_plus_library")
-    if is_toxin_plus_library:
-        enrichment = 8.0 if float(iptg_mM) >= 1 else 3.5
+    library_skew is a fixed per-binder founder-effect multiplier applied to
+    every sample equally (including plasmid_library itself) - a real pooled
+    prep is rarely perfectly equimolar, and that skew carries through into
+    every sample derived from transforming that same pool.
+    """
+    n = len(binder_ids)
+    base = library_skew.copy()
+
+    if condition == "toxin_plus_library_0.1mM":
         for idx, b in enumerate(binder_ids):
             if b in true_binder_ids:
-                base[idx] *= enrichment
+                base[idx] *= 5.0
 
     # small multiplicative noise per binder to mimic biological variability
     noise = rng.lognormal(mean=0.0, sigma=0.15, size=n)
@@ -162,14 +171,16 @@ def main():
     true_binder_ids = set(rng.sample(binder_ids, min(args.n_true_binders, len(binder_ids))))
     print(f"Designated true binders for this simulation: {sorted(true_binder_ids)}")
 
+    # Fixed founder-effect skew, shared by every sample (plasmid_library included).
+    library_skew = np_rng.lognormal(mean=0.0, sigma=0.8, size=len(binder_ids))
+
     samples = read_samples_tsv(SAMPLES_TSV)
 
     for row in samples:
         sample_id = row["sample_id"]
         condition = row["condition"]
-        iptg = row["iptg_mM"]
 
-        probs = relative_abundance(binder_ids, true_binder_ids, condition, iptg, np_rng)
+        probs = relative_abundance(binder_ids, true_binder_ids, condition, library_skew, np_rng)
         counts = np_rng.multinomial(args.reads_per_sample, probs)
 
         os.makedirs(DEMUX_DIR, exist_ok=True)
@@ -182,7 +193,7 @@ def main():
         np_rng.shuffle(np.arange(len(pairs)))  # cheap shuffle of order isn't essential; skip heavy shuffle for speed
 
         write_fastq_pair(DEMUX_DIR, sample_id, pairs, rng)
-        print(f"  {sample_id} ({condition}, IPTG={iptg}mM): {len(pairs)} read pairs -> {DEMUX_DIR}/")
+        print(f"  {sample_id} ({condition}): {len(pairs)} read pairs -> {DEMUX_DIR}/")
 
     print("\nSimulated data ready. You can now run:")
     print("  scripts/01_qc_trim.sh")

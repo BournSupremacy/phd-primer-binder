@@ -16,13 +16,13 @@
 # (sbatch scripts/01_qc_trim.sh) - the #SBATCH lines above are ordinary
 # comments to bash and are only read by sbatch.
 #
-# Usage: scripts/01_qc_trim.sh [--samples config/samples.tsv] [--out-dir data/qc_trimmed]
+# Usage: scripts/01_qc_trim.sh [--samples config/samples_template.tsv] [--out-dir data/qc_trimmed]
 
 set -euo pipefail
 mkdir -p logs
 module load fastp
 
-SAMPLES_TSV="config/samples.tsv"
+SAMPLES_TSV="config/samples_template.tsv"
 OUT_DIR="data/qc_trimmed"
 
 while [[ $# -gt 0 ]]; do
@@ -42,7 +42,7 @@ mkdir -p "$OUT_DIR"
 # runs for it.
 mapfile -t sample_lines < <(tail -n +2 "$SAMPLES_TSV")
 for line in "${sample_lines[@]}"; do
-  IFS=$'\t' read -r sample_id _condition _rep _ara _iptg r1 r2 <<< "$line"
+  IFS=$'\t' read -r sample_id _condition _ara _iptg r1 r2 <<< "$line"
   [[ -z "$sample_id" ]] && continue
   if [[ ! -f "$r1" || ! -f "$r2" ]]; then
     echo "WARNING: missing fastq for $sample_id ($r1 / $r2) - skipping. Run 00_bcl_to_fastq.sh first." >&2

@@ -13,7 +13,7 @@
 #   bwa mem (like any standard PE aligner) places R1 and R2 independently onto
 #   the same reference contig in FR orientation - it does NOT require the two
 #   mates to overlap. So even though our binders (>300bp) are longer than the
-#   R1+R2 combined footprint (300bp) and the mates never touch in the middle,
+#   R1+R2 combined footprint (100bp) and the mates never touch in the middle,
 #   bwa mem still correctly identifies which of the 88 binder sequences a read
 #   pair came from. Stitching (DiMSum/PEAR-style) is only needed when you must
 #   reconstruct one full-length consensus read per molecule (e.g. to call
@@ -25,7 +25,7 @@
 # ordinary comments to bash and are only read by sbatch. No --mem set
 # (standard per-cpu default).
 #
-# Usage: scripts/02_align_and_count.sh [--samples config/samples.tsv]
+# Usage: scripts/02_align_and_count.sh [--samples config/samples_template.tsv]
 #          [--ref data/binders.fasta] [--trimmed-dir data/qc_trimmed]
 #          [--out-dir results] [--min-mapq 20]
 
@@ -33,7 +33,7 @@ set -euo pipefail
 mkdir -p logs
 module load BWA SAMtools Python Pysam
 
-SAMPLES_TSV="config/samples.tsv"
+SAMPLES_TSV="config/samples_template.tsv"
 REF="data/binders.fasta"
 TRIMMED_DIR="data/qc_trimmed"
 OUT_DIR="results"
@@ -70,7 +70,7 @@ samtools faidx "$REF"
 # runs for it.
 mapfile -t sample_lines < <(tail -n +2 "$SAMPLES_TSV")
 for line in "${sample_lines[@]}"; do
-  IFS=$'\t' read -r sample_id _condition _rep _ara _iptg _r1 _r2 <<< "$line"
+  IFS=$'\t' read -r sample_id _condition _ara _iptg _r1 _r2 <<< "$line"
   [[ -z "$sample_id" ]] && continue
   r1_trim="$TRIMMED_DIR/$sample_id/${sample_id}_R1.trimmed.fastq.gz"
   r2_trim="$TRIMMED_DIR/$sample_id/${sample_id}_R2.trimmed.fastq.gz"

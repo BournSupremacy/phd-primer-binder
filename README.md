@@ -13,31 +13,31 @@ after selection is a readout of how well it protects the cell**: the better
 a binder blocks RcaT, the more its carrier cells survive, and the more reads
 it contributes to the pool.
 
-6 samples: one per condition (no biological replicates).
+5 samples, one per condition:
 
 | Condition | Ara (toxin inducer) | IPTG (binder inducer) |
 |---|---|---|
+| plasmid_library | - | - |
 | no_inducer | - | - |
 | toxin_only | 0.2% | - |
 | library_only_0.1mM | - | 0.1 mM |
-| library_only_1mM | - | 1 mM |
 | toxin_plus_library_0.1mM | 0.2% | 0.1 mM |
-| toxin_plus_library_1mM | 0.2% | 1 mM |
 
-The 1 mM IPTG conditions (`library_only_1mM`, `toxin_plus_library_1mM`) are
-sequenced but not part of the analysis - `DMS_analysis.Rmd` reads them in
-and drops them in Section 1, so the whole comparison runs on the 0.1 mM
-conditions only.
+`plasmid_library` is the pooled plasmid prep itself, sequenced directly -
+no transformation or growth at all. It's there to check whether the pool is
+already unevenly represented before a single cell is grown, or whether any
+skew only shows up afterwards (see `analysis/DMS_analysis.Rmd` Section 2).
 
-Sequencing: Illumina MiSeq i100 5M, 150bp paired-end, dual PCR barcoding for
+Sequencing: Illumina MiSeq i100 5M, 50bp paired-end, dual PCR barcoding for
 demultiplexing.
 
 ## Repository layout
 
 ```
 config/
-  samples.tsv                     sample sheet used by every downstream step
+  samples_template.tsv             sample sheet used by every downstream step
   IlluminaSampleSheet_template.csv template BCL Convert sample sheet for demux (fill in real indices)
+  barcodes.txt                     reference table of the PCR barcode sequences used to fill in the sheet above
 data/
   binders.fasta                   the 88 designed RcaT binder sequences - the alignment reference used throughout
   plate_assay_reference_hits.tsv  collaborator's published plate-based screen results, for the comparison in DMS_analysis.Rmd
@@ -48,11 +48,9 @@ scripts/
   02_align_and_count.sh            bwa mem alignment to data/binders.fasta + counting (also an sbatch script)
   count_reads_per_binder.py        per-binder read-pair tallying used by 02_align_and_count.sh
   simulate_test_data.py            generate synthetic reads so you can dry-run the whole thing now
-run_pipeline.sh                    convenience wrapper that runs 00->01->02 in order
-slurm/submit_pipeline.sh           submits the same 3 scripts via sbatch, chained with job dependencies - see "Running on a SLURM cluster"
 environment.yml                    conda env for the demux/QC/alignment tools (fallback if your cluster has no modules for them)
 analysis/
-  DMS_analysis.Rmd                 the actual DMS-style analysis (normalisation, log2FC, hit table)
+  DMS_analysis.Rmd                 the actual DMS-style analysis (normalisation, fitness, hit table)
   DMS_analysis_expression_batches.Rmd  variant that splits the panel into high-/low-expressing batches before
                                         normalising, so a handful of dominant binders can't compositionally
                                         drown out the comparison for everyone else - see its own Section 0
@@ -69,10 +67,10 @@ throughout.
 
 1. Copy `config/IlluminaSampleSheet_template.csv` to
    `config/IlluminaSampleSheet.csv` and fill in the real i7/i5 index
-   sequences for each of the 12 PCR-barcoded samples. A few notes on this
+   sequences for each of the 5 PCR-barcoded samples. A few notes on this
    file:
    - Keep the `Sample_ID` values identical to `sample_id` in
-     `config/samples.tsv` so downstream steps can find the right fastq
+     `config/samples_template.tsv` so downstream steps can find the right fastq
      files automatically.
    - Don't add comments or any other free text to this file - BCL Convert's
      sample sheet parser doesn't support a comment syntax, and stray text
@@ -98,15 +96,20 @@ throughout.
      correct. Still worth a 30-second confirmation with GeneCore before a
      real run, since a flipped i5 sends most of your reads to
      `Undetermined` instead of a sample.
-2. Check `config/samples.tsv` - the `sample_id` column must match the
+2. Check `config/samples_template.tsv` - the `sample_id` column must match the
    `Sample_ID`s in your Illumina sample sheet.
-3. Run:
+3. Submit each step yourself, one at a time, checking the output before
+   moving to the next:
    ```bash
-   ./run_pipeline.sh --run-dir /path/to/raw/MiSeqRun --ref data/binders.fasta
+   sbatch scripts/00_bcl_to_fastq.sh --run-dir /path/to/raw/MiSeqRun --ref data/binders.fasta
+   # wait for it to finish, check data/demux/, then:
+   sbatch scripts/01_qc_trim.sh
+   # wait for it to finish, check the fastp .html reports, then:
+   sbatch scripts/02_align_and_count.sh --ref data/binders.fasta
    ```
-   or the individual `scripts/00_*`, `01_*`, `02_*` steps one at a time -
-   each is a standalone script with `--help`-able arguments, useful for
-   understanding/debugging one step at a time.
+   Each is a standalone script with `--help`-able arguments - see "Running
+   on a SLURM cluster" below for running them directly instead of via
+   `sbatch`.
 4. Open `analysis/DMS_analysis.Rmd` and knit it.
 
 ## Running on a SLURM cluster
@@ -125,18 +128,13 @@ sbatch scripts/00_bcl_to_fastq.sh --run-dir /path/to/raw/MiSeqRun  # submits as 
 (`#SBATCH` lines are just `#`-comments to bash, so running a script directly
 ignores them - only `sbatch` reads them.)
 
-To run all three chained together with `--dependency=afterok` (so step 2
-only starts once step 1 has actually finished successfully), use:
-
-```bash
-slurm/submit_pipeline.sh --run-dir /path/to/raw/MiSeqRun
-```
-
-This submits all three jobs at once (they just wait on each other in the
-queue) and prints the job IDs and log file paths
-(`logs/00_demux_<jobid>.out`, etc.) so you can `squeue -u $USER` and tail
-the logs. Add `--force` if you're re-running over a previous demux output.
-Resource requests are sized for this dataset (88 binders, 12 samples, a 5M
+Submit each of the three steps yourself, one at a time, once the previous
+one has actually finished - there's no chained/all-in-one submission script
+here by design, since it's worth looking at each step's output before
+moving on. Track progress with `squeue -u $USER`; logs land in
+`logs/00_demux_<jobid>.out` etc. (and matching `.err` files). Add `--force`
+to `00_bcl_to_fastq.sh` if you're re-running over a previous demux output.
+Resource requests are sized for this dataset (88 binders, 5 samples, a 5M
 MiSeq i100 run) on the `htc-el8` partition - bump `--cpus-per-task`/`--mem`/
 `--time` up in the relevant script's `#SBATCH` lines if you outgrow it, and
 add an `--account` directive if your cluster requires one.
@@ -167,14 +165,17 @@ these:
 
 This mirrors the lab's existing plate-based version of the same assay, with
 `no_inducer` used as a QC/viability step rather than a normalisation input.
-There's a single sample per condition (no biological replicates), so every
-log2FC below is a one-off point estimate.
+There's a single sample per condition, so every fitness value below is a
+one-off point estimate. The notebook is meant to be worked through together
+- each section ends with something to discuss, not just a result to read.
 
 1. Load `results/binder_counts.tsv` (long format: sample, binder, count) +
-   `config/samples.tsv` metadata; reshape into a binder x sample table. The
-   1 mM IPTG conditions are read in here too, then immediately dropped -
-   nothing downstream ever sees them.
-2. QC: read depth and number of binders detected per sample, a **library
+   `config/samples_template.tsv` metadata; reshape into a binder x sample table.
+2. **Library representation**: compare `plasmid_library` (the raw plasmid
+   prep, no cells involved) against `no_inducer` (grown, unselected) - does
+   any skew in the pool already exist before a single cell was grown, or
+   does it only show up after growth?
+3. QC: read depth and number of binders detected per sample, a **library
    complexity check** - since this is a competitive pooled assay, a handful
    of binders dominating the pool squeezes everyone else into very few
    reads regardless of biology, so check for that before trusting anything
@@ -182,24 +183,24 @@ log2FC below is a one-off point estimate.
    under `no_inducer` (antibiotic only) falls below a threshold, since a
    plasmid that doesn't even survive plain selection isn't a usable data
    point for anything downstream - and a **low-count filter** - drop any
-   binder whose mean read count across all the remaining samples falls
-   below a threshold (5 by default), since the viability filter alone
-   doesn't catch a binder that's merely thin everywhere else.
-3. Normalise: each binder's count -> relative frequency within its sample
+   binder whose mean read count across the remaining samples falls below a
+   threshold (5 by default), since the viability filter alone doesn't catch
+   a binder that's merely thin everywhere else.
+4. Normalise: each binder's count -> relative frequency within its sample
    (total-read-depth normalisation), with a pseudocount so zero-count
    binders don't blow up on the log scale.
-4. Innate toxicity (context only): log2FC of `library_only` vs. `no_inducer`
+5. Innate toxicity (context only): log2FC of `library_only_0.1mM` vs. `no_inducer`
    - how costly is overexpressing this binder on its own, with no toxin
    present? Reported for interpretation, not used to correct the main
    result.
-5. **The actual answer**: a DiMSum-style fitness score for toxin+library vs.
-   **library-only** (both at 0.1 mM IPTG) - a ratio-of-ratios relative to
-   one reference binder (chosen by inspecting the QC plots; see the
-   notebook) rather than a plain frequency ratio, so that whatever shifts
-   every binder's apparent abundance equally - like the library-complexity
-   skew in step 2 - cancels out.
-6. Final ranked hit table, written to `results/final_binder_ranking.csv`.
-7. Comparison to the collaborator's published plate-based screen of the same
+6. **The actual answer**: a DiMSum-style fitness score for toxin+library vs.
+   **library-only** - a ratio-of-ratios relative to one reference binder
+   (chosen by inspecting the QC plots; see the notebook) rather than a
+   plain frequency ratio, so that whatever shifts every binder's apparent
+   abundance equally - like the library-complexity skew in step 3 -
+   cancels out.
+7. Final ranked hit table, written to `results/final_binder_ranking.csv`.
+8. Comparison to the collaborator's published plate-based screen of the same
    binders (`data/plate_assay_reference_hits.tsv`, filtered to the Sen2
    retron) - a rough sanity check on direction/ranking, not a strict
    validation (their effect size uses a different baseline), written to

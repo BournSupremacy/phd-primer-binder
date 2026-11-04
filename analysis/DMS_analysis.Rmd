@@ -16,22 +16,22 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.width =
 ## 0. What this notebook does
 
 88 candidate binders against the RcaT toxin, pooled and sequenced under
-several conditions (`config/samples.tsv`). RcaT kills the cell unless
+several conditions (`config/samples_template.tsv`). RcaT kills the cell unless
 something blocks it, so a binder's relative abundance after selection
 reflects how well it protects the cell.
 
-Conditions this notebook actually uses (all IPTG-induced ones at 0.1 mM):
+Conditions:
 
-- `no_inducer` - viability check (Section 2).
+- `plasmid_library` - the pooled plasmid prep itself, sequenced directly,
+  no cells involved at all (Section 2).
+- `no_inducer` - grown, plain antibiotic selection only (Section 2-3).
 - `library_only_0.1mM` - binder induced, no toxin.
 - `toxin_plus_library_0.1mM` - binder induced, toxin present.
 
-`toxin_only` and the 1 mM IPTG conditions are loaded in Section 1 but not
-used downstream - for each, why might that be?
+`toxin_only` is loaded but not used downstream - why might that be?
 
-Steps: load data, QC/filter, normalise, check innate toxicity, compute
-fitness relative to a reference binder, rank, compare to the published
-plate-based screen.
+This notebook is meant to be worked through together, not just run - each
+section ends with something to discuss before moving on.
 
 ```{r libraries}
 library(tidyverse)   # readr, dplyr, tidyr, ggplot2, purrr
@@ -42,7 +42,7 @@ library(scales)      # nice axis labels
 
 ```{r load-data}
 counts_long <- read_tsv("../results/binder_counts.tsv", show_col_types = FALSE)
-samples     <- read_tsv("../config/samples.tsv", show_col_types = FALSE)
+samples     <- read_tsv("../config/samples_template.tsv", show_col_types = FALSE)
 
 # A binder with zero reads in a sample is simply absent from binder_counts.tsv -
 # fill those in explicitly rather than letting them silently disappear.
@@ -50,9 +50,6 @@ counts_long <- counts_long %>%
   complete(binder_id, sample_id = samples$sample_id, fill = list(count = 0)) %>%
   left_join(samples %>% select(sample_id, condition, ara_pct, iptg_mM),
             by = "sample_id")
-
-counts_long <- counts_long %>%
-  filter(!condition %in% c("library_only_1mM", "toxin_plus_library_1mM"))
 
 head(counts_long)
 ```
@@ -65,7 +62,41 @@ counts_wide <- counts_long %>%
 counts_wide
 ```
 
-## 2. QC: sequencing depth and binder detection
+One row per binder, one column per sample - does this match what you
+expected from `config/samples_template.tsv`? Anything surprising already?
+
+## 2. Library representation: plasmid pool vs. after growth
+
+`plasmid_library` is the pooled plasmid prep itself - no transformation, no
+growth, no selection at all. Comparing it to `no_inducer` (grown, plain
+antibiotic selection, nothing induced) tells you whether any skew you see
+later already existed in the tube, or only shows up once cells start
+growing.
+
+```{r plasmid-library-check}
+plasmid_vs_no_inducer <- counts_long %>%
+  filter(condition %in% c("plasmid_library", "no_inducer")) %>%
+  group_by(sample_id) %>%
+  mutate(freq = count / sum(count)) %>%
+  ungroup() %>%
+  select(binder_id, condition, freq) %>%
+  pivot_wider(names_from = condition, values_from = freq)
+
+plasmid_vs_no_inducer %>%
+  ggplot(aes(x = plasmid_library, y = no_inducer)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey40") +
+  scale_x_log10(labels = label_number()) +
+  scale_y_log10(labels = label_number()) +
+  labs(x = "Relative frequency: plasmid_library", y = "Relative frequency: no_inducer",
+       title = "Library representation: raw plasmid prep vs. after growth") +
+  theme_minimal()
+```
+
+Does this look like fair representation, or does the library structure
+already look skewed before a single cell was even grown?
+
+## 3. QC: sequencing depth and binder detection
 
 ```{r qc-depth}
 depth <- counts_long %>%
@@ -119,9 +150,9 @@ complexity %>%
   arrange(binders_for_90pct_of_reads)
 ```
 
-If a handful of binders dominate every sample about equally (including
-`no_inducer`, before any selection), is that more likely a pool-prep problem
-or a selection effect? Keep this in mind in Section 5.
+If a handful of binders dominate every sample about equally, is that more
+likely a pool-prep problem or a selection effect? (You already have an
+answer to that from Section 2.)
 
 ### Viability filter: drop binders that don't survive no-inducer selection
 
@@ -163,6 +194,7 @@ The viability filter above only looks at `no_inducer`. What's it missing?
 min_mean_count <- 5  # tune by eye against the histogram below
 
 mean_counts <- counts_long %>%
+  filter(condition != "plasmid_library") %>%  # not part of the downstream comparison
   group_by(binder_id) %>%
   summarise(mean_count = mean(count), .groups = "drop")
 
@@ -189,7 +221,10 @@ if (length(low_count_binders) > 0) {
 counts_long <- counts_long %>% filter(!(binder_id %in% low_count_binders))
 ```
 
-## 3. Normalisation
+Between the viability and low-count filters, how many binders got dropped
+in total? Does that feel like a lot, for 88 designed binders?
+
+## 4. Normalisation
 
 Convert each binder's count to its relative frequency within the sample,
 with a pseudocount so zero-count binders don't produce `-Inf` on the log
@@ -209,10 +244,13 @@ counts_norm <- counts_long %>%
 counts_norm %>% select(sample_id, binder_id, count, total_reads, freq) %>% head()
 ```
 
-## 4. Innate toxicity of overexpression (reference only)
+Why divide by total reads instead of comparing raw counts directly? What
+would raw counts conflate?
+
+## 5. Innate toxicity of overexpression (reference only)
 
 How much does overexpressing each binder cost the cell on its own, with no
-toxin present (`library_only` vs. `no_inducer`)? Not used in Section 5 -
+toxin present (`library_only_0.1mM` vs. `no_inducer`)? Not used in Section 6 -
 context only.
 
 ```{r innate-toxicity}
@@ -234,10 +272,10 @@ innate_toxicity %>%
   theme(axis.text.x = element_blank())
 ```
 
-Worth remembering if a binder here also shows up near the top of the hit
-table below.
+Does any binder here look costly enough to overexpress that it's worth
+remembering if it also shows up near the top of the hit table later?
 
-## 5. Fitness: toxin+library vs. library-only
+## 6. Fitness: toxin+library vs. library-only
 
 DiMSum-style fitness, relative to one reference binder instead of a plain
 frequency ratio:
@@ -246,10 +284,9 @@ frequency ratio:
 fitness = log2( (selected / input) / (ref_selected / ref_input) )
 ```
 
-`input` = `library_only_0.1mM`, `selected` = `toxin_plus_library_0.1mM`. The
-reference is a binder you're confident isn't a real hit - look back at
-Section 2's plots. What would make a bad choice here? What would make a
-good one?
+`input` = `library_only_0.1mM`, `selected` = `toxin_plus_library_0.1mM`. The reference
+is a binder you're confident isn't a real hit - look back at Section 3's
+plots. What would make a bad choice here? What would make a good one?
 
 ```{r choose-reference}
 reference_binder <- "result_50aa_1_10"  # <- pick your own and be ready to justify it
@@ -286,7 +323,7 @@ key_comparison %>%
 What does this formula assume about the reference binder, and what happens
 to every other binder's fitness if that assumption is wrong?
 
-## 6. Final ranked hit table
+## 7. Final ranked hit table
 
 ```{r final-hits}
 hit_results <- key_comparison %>%
@@ -311,7 +348,10 @@ hit_results %>%
 write_csv(hit_results, "../results/final_binder_ranking.csv")
 ```
 
-## 7. Comparison to the published plate-based screen (Sen2 retron)
+Does the top of this table look like a clean break from the rest, or a
+gradual slope? What would each imply about where to draw a "hit" line?
+
+## 8. Comparison to the published plate-based screen (Sen2 retron)
 
 Our collaborator's plate-based screen of the same binders
 (`data/plate_assay_reference_hits.tsv`, filtered to `retron == "Sen2"` -
@@ -364,12 +404,14 @@ write_csv(comparison, "../results/plate_assay_comparison.csv")
 ```
 
 A binder missing from `plate_reference` above just wasn't in that dataset -
-check `n_binders_matched` against Section 2's viable-binder count.
+check `n_binders_matched` against Section 3's viable-binder count. Overall,
+would you call this a successful validation of this screen?
 
 ## Where to go from here
 
-* The library-complexity check in Section 2 is worth flagging back to
-  whoever built/pooled this plasmid library - a better-normalised pool
-  (e.g. qPCR-checked equimolar pooling) fixes the problem at the source.
+* The library-complexity check in Section 3 (and the plasmid-library check
+  in Section 2) is worth flagging back to whoever built/pooled this
+  plasmid library if it shows a skew - a better-normalised pool (e.g.
+  qPCR-checked equimolar pooling) fixes the problem at the source.
 * No GFP (or other neutral-overexpression) control is included here. Would
-  adding one change how you'd compute fitness in Section 5?
+  adding one change how you'd compute fitness in Section 6?

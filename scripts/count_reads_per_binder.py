@@ -87,7 +87,7 @@ def count_bam(bam_path, min_mapq):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--samples", required=True, help="config/samples.tsv")
+    p.add_argument("--samples", required=True, help="config/samples_template.tsv")
     p.add_argument("--bam-dir", required=True, help="directory of <sample_id>.bam files")
     p.add_argument("--min-mapq", type=int, default=20)
     p.add_argument("--out", required=True, help="output long-format counts TSV")

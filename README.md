@@ -89,14 +89,11 @@ throughout.
    moving to the next. This can all be done on the login node, and make
    sure you're in the main directory of the GitHub repo:
    ```bash
-   sbatch scripts/00_bcl_to_fastq.sh --run-dir /path/to/raw/MiSeqRun
-   --sample-sheet config/IlluminaSampleSheet.csv --out-dir data/demux/
-   --ref data/binders.fasta
+   sbatch scripts/00_bcl_to_fastq.sh --run-dir /path/to/raw/MiSeqRun --sample-sheet config/IlluminaSampleSheet.csv --out-dir data/demux/ --ref data/binders.fasta
    # wait for it to finish, check data/demux/, then:
    sbatch scripts/01_qc_trim.sh --samples config/samples.tsv --out-dir data/qc_trimmed
    # wait for it to finish, check the fastp .html reports, then:
-   sbatch scripts/02_align_and_count.sh --samples config/samples.tsv
-   --trimmed-dir data/qc_trimmed --out-dir results --min-mapq 20--ref data/binders.fasta
+   sbatch scripts/02_align_and_count.sh --samples config/samples.tsv --trimmed-dir data/qc_trimmed --out-dir results --min-mapq 20--ref data/binders.fasta
    ```
 5. Open `analysis/DMS_analysis.Rmd` and knit it.
 

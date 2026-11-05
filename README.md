@@ -72,15 +72,9 @@ throughout.
    - Keep the `Sample_ID` values identical to `sample_id` in
      `config/samples_template.tsv` so downstream steps can find the right fastq
      files automatically.
-   - Don't add comments or any other free text to this file - BCL Convert's
-     sample sheet parser doesn't support a comment syntax, and stray text
-     before `[Header]` can stop it from recognizing the sheet as v2 format
-     at all, silently falling back to legacy v1 parsing (which expects a
-     `[Data]` section instead of `[BCLConvert_Data]`) and failing with
-     "File has no valid [Data] section". Keep it as plain, valid CSV.
-   - Type both `index` (i7) as the plain 5'->3' primer sequence exactly
-     as ordered/synthesised, and `index2` (i5) as the reverse complement
-     sequence of what was ordered. This is what this version of BCL Convert
+   - Type  `index` (i7) as the the reverse complement
+     sequence of what was ordered and `index2` (i5) as plain 5'->3' primer sequence exactly
+     as ordered/synthesised. This is what this version of BCL Convert
      is expecting, but always make sure to check based on the sequencing
      platform and program you're using!
 2. Check `config/samples_template.tsv` - the `sample_id` column must match the

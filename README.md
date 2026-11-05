@@ -115,11 +115,9 @@ add an `--account` directive if your cluster requires one.
 
 ## The analysis logic (see `analysis/DMS_analysis.Rmd` for the full walkthrough)
 
-This mirrors the lab's existing plate-based version of the same assay, with
-`no_inducer` used as a QC/viability step rather than a normalisation input.
+This mirrors the lab's existing plate-based version of the same assay.
 There's a single sample per condition, so every fitness value below is a
-one-off point estimate. The notebook is meant to be worked through together
-- each section ends with something to discuss, not just a result to read.
+one-off point estimate.
 
 1. Load `results/binder_counts.tsv` (long format: sample, binder, count) +
    `config/samples_template.tsv` metadata; reshape into a binder x sample table.
@@ -148,9 +146,7 @@ one-off point estimate. The notebook is meant to be worked through together
 6. **The actual answer**: a DiMSum-style fitness score for toxin+library vs.
    **library-only** - a ratio-of-ratios relative to one reference binder
    (chosen by inspecting the QC plots; see the notebook) rather than a
-   plain frequency ratio, so that whatever shifts every binder's apparent
-   abundance equally - like the library-complexity skew in step 3 -
-   cancels out.
+   plain frequency ratio.
 7. Final ranked hit table, written to `results/final_binder_ranking.csv`.
 8. Comparison to the collaborator's published plate-based screen of the same
    binders (`data/plate_assay_reference_hits.tsv`, filtered to the Sen2

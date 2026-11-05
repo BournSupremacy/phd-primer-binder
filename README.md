@@ -2,7 +2,7 @@
 
 A small, from-scratch pipeline for the EMBL PhD Primer project *"Designing
 functional protein interactions: computational protein design and
-high-throughput biochemistry"* (Dorrity/Mahamid/Eustermann groups, MSB Unit).
+high-throughput biochemistry"* (Dorrity/Mahamid/Eustermann/Typas groups, MSB Unit).
 
 ## The experiment
 
@@ -78,55 +78,29 @@ throughout.
      at all, silently falling back to legacy v1 parsing (which expects a
      `[Data]` section instead of `[BCLConvert_Data]`) and failing with
      "File has no valid [Data] section". Keep it as plain, valid CSV.
-   - If you're using legacy `bcl2fastq` instead of BCL Convert (not
-     recommended for MiSeq i100 output - see the comment in
-     `scripts/00_bcl_to_fastq.sh`), it expects a `[Data]` section (not
-     `[BCLConvert_Data]`) with columns
-     `Sample_ID,Sample_Name,index,index2,Sample_Project` and no
-     `[BCLConvert_Settings]` section - a different file, not a variant of
-     this template.
-   - Type both `index` (i7) and `index2` (i5) as the plain 5'->3' primer
-     sequence exactly as ordered/synthesized - do NOT manually
-     reverse-complement either one. On many older 2-channel Illumina
-     instruments (NextSeq, NovaSeq, iSeq, MiniSeq) you historically had to
-     manually enter the i5 as its reverse complement, which trips a lot of
-     people up; on the MiSeq i100 with a standard BCL Convert sample sheet
-     like this one, that flip is handled automatically from a flag in the
-     run's `RunInfo.xml`, so plain forward orientation for both indices is
-     correct. Still worth a 30-second confirmation with GeneCore before a
-     real run, since a flipped i5 sends most of your reads to
-     `Undetermined` instead of a sample.
+   - Type both `index` (i7) as the plain 5'->3' primer sequence exactly
+     as ordered/synthesised, and `index2` (i5) as the reverse complement
+     sequence of what was ordered. This is what this version of BCL Convert
+     is expecting, but always make sure to check based on the sequencing
+     platform and program you're using!
 2. Check `config/samples_template.tsv` - the `sample_id` column must match the
    `Sample_ID`s in your Illumina sample sheet.
 3. Submit each step yourself, one at a time, checking the output before
-   moving to the next:
+   moving to the next. This can all be done on the login node, and make
+   sure you're in the main directory of the GitHub repo:
    ```bash
-   sbatch scripts/00_bcl_to_fastq.sh --run-dir /path/to/raw/MiSeqRun --ref data/binders.fasta
+   sbatch scripts/00_bcl_to_fastq.sh --run-dir /path/to/raw/MiSeqRun
+   --sample-sheet config/IlluminaSampleSheet.csv --out-dir data/demux/
+   --ref data/binders.fasta
    # wait for it to finish, check data/demux/, then:
-   sbatch scripts/01_qc_trim.sh
+   sbatch scripts/01_qc_trim.sh --samples config/samples.tsv --out-dir data/qc_trimmed
    # wait for it to finish, check the fastp .html reports, then:
-   sbatch scripts/02_align_and_count.sh --ref data/binders.fasta
+   sbatch scripts/02_align_and_count.sh --samples config/samples.tsv
+   --trimmed-dir data/qc_trimmed --out-dir results --min-mapq 20--ref data/binders.fasta
    ```
-   Each is a standalone script with `--help`-able arguments - see "Running
-   on a SLURM cluster" below for running them directly instead of via
-   `sbatch`.
-4. Open `analysis/DMS_analysis.Rmd` and knit it.
+5. Open `analysis/DMS_analysis.Rmd` and knit it.
 
 ## Running on a SLURM cluster
-
-`bcl-convert` in particular is a heavy, multi-threaded job (tens of minutes
-on real sequencer output) - don't run it on a login/interactive node. Each
-of `scripts/00_bcl_to_fastq.sh`, `scripts/01_qc_trim.sh`, and
-`scripts/02_align_and_count.sh` carries its own `#SBATCH` directives right
-after the shebang, so the same file works two ways:
-
-```bash
-bash scripts/00_bcl_to_fastq.sh --run-dir /path/to/raw/MiSeqRun    # runs directly
-sbatch scripts/00_bcl_to_fastq.sh --run-dir /path/to/raw/MiSeqRun  # submits as a SLURM job
-```
-
-(`#SBATCH` lines are just `#`-comments to bash, so running a script directly
-ignores them - only `sbatch` reads them.)
 
 Submit each of the three steps yourself, one at a time, once the previous
 one has actually finished - there's no chained/all-in-one submission script
@@ -134,32 +108,10 @@ here by design, since it's worth looking at each step's output before
 moving on. Track progress with `squeue -u $USER`; logs land in
 `logs/00_demux_<jobid>.out` etc. (and matching `.err` files). Add `--force`
 to `00_bcl_to_fastq.sh` if you're re-running over a previous demux output.
-Resource requests are sized for this dataset (88 binders, 5 samples, a 5M
+Resource requests are sized for this dataset (88 binders, 5 samples, a 25M
 MiSeq i100 run) on the `htc-el8` partition - bump `--cpus-per-task`/`--mem`/
 `--time` up in the relevant script's `#SBATCH` lines if you outgrow it, and
 add an `--account` directive if your cluster requires one.
-
-An interactive node (`salloc`/`srun --pty bash`) is fine for quick
-debugging or running `scripts/simulate_test_data.py`, but isn't needed to
-run the real pipeline steps themselves.
-
-## Environment setup
-
-Each script loads what it needs via cluster environment modules, right
-after `set -euo pipefail` - no conda required on a cluster that provides
-these:
-
-- `scripts/00_bcl_to_fastq.sh`: `module load bcl-convert`
-- `scripts/01_qc_trim.sh`: `module load fastp`
-- `scripts/02_align_and_count.sh`: `module load BWA SAMtools Python Pysam`
-  (`Python`/`Pysam` are for `count_reads_per_binder.py`, called at the end
-  of that script - BWA/SAMtools alone don't cover it)
-
-- **Analysis** (`analysis/DMS_analysis.Rmd`): R with `tidyverse` and
-  `scales`:
-  ```r
-  install.packages(c("tidyverse", "scales", "rmarkdown"))
-  ```
 
 ## The analysis logic (see `analysis/DMS_analysis.Rmd` for the full walkthrough)
 

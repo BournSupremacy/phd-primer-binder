@@ -4,13 +4,13 @@ RunName,phd_primer_RcaT_binder_screen
 InstrumentPlatform,MiSeq
 
 [Reads]
-Read1Cycles,50
-Read2Cycles,50
+Read1Cycles,59
+Read2Cycles,59
 
 [BCLConvert_Settings]
 AdapterRead1,AATGATACGGCGACCACCGAGATCTACAC
 AdapterRead2,CAAGCAGAAGACGGCATACGAGAT
-OverrideCycles,Y50;I10;N10;Y50
+OverrideCycles,Y59;I10;N10;Y59
 
 [BCLConvert_Data]
 Sample_ID,index,index2

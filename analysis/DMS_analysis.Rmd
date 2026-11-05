@@ -158,17 +158,24 @@ answer to that from Section 2.)
 ### Viability filter: drop binders that don't survive no-inducer selection
 
 ```{r viability-filter}
-min_no_inducer_reads <- 10  # tune by eye against the histogram below
+min_no_inducer_reads <- 10  # tune by eye against the dataframe produced
 
 no_inducer_counts <- counts_long %>%
   filter(condition == "no_inducer") %>%
   select(binder_id, no_inducer_count = count)
 
 no_inducer_counts %>%
-  ggplot(aes(x = no_inducer_count)) +
-  geom_histogram(bins = 30) +
-  geom_vline(xintercept = min_no_inducer_reads, linetype = "dashed", colour = "red") +
-  labs(x = "no_inducer read count", y = "Number of binders",
+  ggplot(aes(x = no_inducer_count + 1)) +   # +1 so zero counts survive the log
+  geom_histogram(bins = 40, fill = "grey30", colour = "white") +
+  geom_vline(xintercept = min_no_inducer_reads + 1,
+             linetype = "dashed", colour = "red") +
+  scale_x_log10(
+    breaks = c(1, 10, 100, 1000, 10000, 100000),
+    labels = scales::comma,
+    guide = guide_axis(minor.ticks = TRUE)
+  ) +
+  labs(x = "no_inducer read count (+1, log10 scale)",
+       y = "Number of binders",
        title = "Choosing the viability threshold",
        subtitle = paste("Dashed line: current threshold =", min_no_inducer_reads)) +
   theme_minimal()
@@ -200,10 +207,17 @@ mean_counts <- counts_long %>%
   summarise(mean_count = mean(count), .groups = "drop")
 
 mean_counts %>%
-  ggplot(aes(x = mean_count)) +
-  geom_histogram(bins = 30) +
-  geom_vline(xintercept = min_mean_count, linetype = "dashed", colour = "red") +
-  labs(x = "Mean read count across all samples", y = "Number of binders",
+  ggplot(aes(x = mean_count + 1)) +
+  geom_histogram(bins = 40, fill = "grey30", colour = "white") +
+  geom_vline(xintercept = min_mean_count + 1,
+             linetype = "dashed", colour = "red") +
+  scale_x_log10(
+    breaks = c(1, 10, 100, 1000, 10000, 100000),
+    labels = scales::comma,
+    guide = guide_axis(minor.ticks = TRUE)
+  ) +
+  labs(x = "Mean read count across all samples (+1, log10 scale)",
+       y = "Number of binders",
        title = "Choosing the low-count filter threshold",
        subtitle = paste("Dashed line: current threshold =", min_mean_count)) +
   theme_minimal()
@@ -290,7 +304,7 @@ is a binder you're confident isn't a real hit - look back at Section 3's
 plots. What would make a bad choice here? What would make a good one?
 
 ```{r choose-reference}
-reference_binder <- "result_50aa_1_10"  # <- pick your own and be ready to justify it
+reference_binder <- ""  # <- pick your own and be ready to justify it
 
 reference_counts <- counts_long %>%
   filter(binder_id == reference_binder, condition %in% c("library_only_0.1mM", "toxin_plus_library_0.1mM")) %>%
@@ -383,21 +397,9 @@ comparison <- hit_results %>%
   left_join(plate_reference, by = "genename") %>%
   filter(!is.na(plate_log2_efsize))
 
-comparison %>%
-  ggplot(aes(x = plate_log2_efsize, y = fitness, colour = plate_hit)) +
-  geom_point(alpha = 0.7, size = 2) +
-  geom_smooth(method = "lm", se = FALSE, colour = "grey40", linetype = "dashed") +
-  labs(x = "Published plate assay: log2(effect size), Sen2 (vs. IPTG-low)",
-       y = "This screen: fitness (toxin+library vs. library-only)",
-       title = "This screen vs. the published plate-based assay",
-       colour = "Plate-assay hit call") +
-  theme_minimal()
+# make your own correlation plot using this df!
+# and work out the correlation coefficient!
 
-comparison %>%
-  summarise(
-    pearson_r         = cor(fitness, plate_log2_efsize, use = "complete.obs"),
-    n_binders_matched = n()
-  )
 ```
 
 ```{r save-comparison-table}

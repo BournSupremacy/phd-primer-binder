@@ -30,6 +30,7 @@ compared only against others at a similar abundance.
 ```{r libraries}
 library(tidyverse)
 library(scales)
+setwd("/home/bourn/phd-primer-binder/analysis/") # change yourself
 ```
 
 ## 1. Load data

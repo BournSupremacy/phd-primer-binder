@@ -36,6 +36,7 @@ section ends with something to discuss before moving on.
 ```{r libraries}
 library(tidyverse)   # readr, dplyr, tidyr, ggplot2, purrr
 library(scales)      # nice axis labels
+setwd("/home/bourn/phd-primer-binder/analysis/") # change yourself
 ```
 
 ## 1. Load data

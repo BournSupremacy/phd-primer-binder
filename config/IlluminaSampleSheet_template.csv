@@ -13,9 +13,9 @@ AdapterRead2,CAAGCAGAAGACGGCATACGAGAT
 OverrideCycles,Y59;I10;N10;Y59
 
 [BCLConvert_Data]
-Sample_ID,index,index2
-noInducer_A,NNNNNNNN,NNNNNNNN
-toxinOnly_A,NNNNNNNN,NNNNNNNN
-libOnly_0_1mM_A,NNNNNNNN,NNNNNNNN
-toxLib_0_1mM_A,NNNNNNNN,NNNNNNNN
-plasmid_lib,NNNNNNNN,NNNNNNNN
+Sample_ID,index
+noInducer_A,NNNNNNNN
+toxinOnly_A,NNNNNNNN
+libOnly_0_1mM_A,NNNNNNNN
+toxLib_0_1mM_A,NNNNNNNN
+plasmid_lib,NNNNNNNN

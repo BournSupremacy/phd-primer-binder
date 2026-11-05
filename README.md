@@ -87,7 +87,7 @@ throughout.
    # wait for it to finish, check data/demux/, then:
    sbatch scripts/01_qc_trim.sh --samples config/samples_template.tsv --out-dir data/qc_trimmed
    # wait for it to finish, check the fastp .html reports, then:
-   sbatch scripts/02_align_and_count.sh --samples config/samples_template.tsv --trimmed-dir data/qc_trimmed --out-dir results --min-mapq 20--ref data/binders.fasta
+   sbatch scripts/02_align_and_count.sh --samples config/samples_template.tsv --trimmed-dir data/qc_trimmed --out-dir results --min-mapq 20 --ref data/binders.fasta
    ```
 5. Open `analysis/DMS_analysis.Rmd` and knit it.
 
